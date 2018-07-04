@@ -228,4 +228,6 @@ Unfortunately there is no faucet for the test-net. So if you want to try out thi
     <string name="or">or</string>
     <string name="trezor_not_initialized">TREZOR not initialized. Please use the TREZOR manager to initialize.</string>
     <string name="process_error">Process Error %s</string>
+    <!--hitcon badge -->
+    <string name="badge_title">Hitcon Badge</string>
 </resources>

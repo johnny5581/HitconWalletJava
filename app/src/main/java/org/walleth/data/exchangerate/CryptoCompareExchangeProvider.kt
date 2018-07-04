@@ -27,7 +27,8 @@ class CryptoCompareExchangeProvider(context: Context, val okHttpClient: OkHttpCl
                     "EUR" to FiatInfo("EUR"),
                     "NZD" to FiatInfo("NZD"),
                     "CHF" to FiatInfo("CHF"),
-                    "USD" to FiatInfo("USD"))
+                    "USD" to FiatInfo("USD"),
+                    "TWD" to FiatInfo("TWD"))
             )
         }
         refresh()

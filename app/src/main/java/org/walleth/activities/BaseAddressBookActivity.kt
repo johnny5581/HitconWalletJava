@@ -21,6 +21,7 @@ import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.ligi.kaxt.startActivityFromClass
 import org.walleth.R
+import org.walleth.activities.hitcon.HitconBadgeActivity
 import org.walleth.data.AppDatabase
 import org.walleth.data.addressbook.AddressBookEntry
 import org.walleth.data.config.Settings

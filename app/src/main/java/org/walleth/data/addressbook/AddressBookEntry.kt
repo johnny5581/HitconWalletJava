@@ -21,6 +21,9 @@ data class AddressBookEntry(
         @ColumnInfo(name = "trezor_derivation_path")
         var trezorDerivationPath: String? = null,
 
+        @ColumnInfo(name = "hitcon_badge_flag")
+        var hitconBadgeFlag: Boolean = false,
+
         var starred: Boolean = false,
 
         var deleted: Boolean = false,

@@ -21,6 +21,9 @@ import org.kethereum.model.Address
 import org.ligi.kaxtui.alert
 import org.walleth.R
 import org.walleth.R.string.*
+import org.walleth.activities.hitcon.HitconBadgeGetAddressActivity
+import org.walleth.activities.hitcon.getBadgeAddressResult
+import org.walleth.activities.hitcon.hasBadgeAddressResult
 import org.walleth.activities.qrscan.startScanActivityForResult
 import org.walleth.activities.trezor.TrezorGetAddressActivity
 import org.walleth.activities.trezor.getAddressResult
@@ -33,6 +36,7 @@ import org.walleth.data.keystore.WallethKeyStore
 
 private const val HEX_INTENT_EXTRA_KEY = "HEX"
 private const val REQUEST_CODE_TREZOR = 7965
+private const val REQUEST_CODE_BADGE = 8072
 
 fun Context.startCreateAccountActivity(hex: String) {
     startActivity(Intent(this, CreateAccountActivity::class.java).apply {
@@ -46,6 +50,7 @@ class CreateAccountActivity : AppCompatActivity() {
     private val appDatabase: AppDatabase by LazyKodein(appKodein).instance()
     private var lastCreatedAddress: Address? = null
     private var trezorPath: String? = null
+    private var isBadge: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +81,8 @@ class CreateAccountActivity : AppCompatActivity() {
                                 address = Address(hex),
                                 note = noteInput.text.toString(),
                                 trezorDerivationPath = trezorPath,
-                                isNotificationWanted = notify_checkbox.isChecked)
+                                isNotificationWanted = notify_checkbox.isChecked,
+                                hitconBadgeFlag = isBadge)
                         )
                     }.await()
                     finish()
@@ -90,6 +96,9 @@ class CreateAccountActivity : AppCompatActivity() {
             startActivityForResult(Intent(this, TrezorGetAddressActivity::class.java), REQUEST_CODE_TREZOR)
         }
 
+        add_badge.setOnClickListener{
+            startActivityForResult(Intent(this, HitconBadgeGetAddressActivity::class.java), REQUEST_CODE_BADGE)
+        }
         new_address_button.setOnClickListener {
             cleanupGeneratedKeyWhenNeeded()
             val newAddress = keyStore.newAddress(DEFAULT_PASSWORD)
@@ -130,6 +139,9 @@ class CreateAccountActivity : AppCompatActivity() {
             if (hasAddressResult()) {
                 trezorPath = getPATHResult()
                 setAddressFromExternalApplyingChecksum(getAddressResult())
+            }
+            else if(hasBadgeAddressResult()) {
+                setAddressFromExternalApplyingChecksum(getBadgeAddressResult())
             }
         }
     }
