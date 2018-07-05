@@ -7,6 +7,7 @@ import org.walleth.data.addressbook.AddressBookDAO;
 import org.walleth.data.addressbook.AddressBookEntry;
 import org.walleth.data.balances.Balance;
 import org.walleth.data.balances.BalanceDAO;
+import org.walleth.data.ble.BadgeServiceDAO;
 import org.walleth.data.tokens.Token;
 import org.walleth.data.tokens.TokenDAO;
 import org.walleth.data.transactions.TransactionDAO;
@@ -23,4 +24,6 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract TransactionDAO getTransactions();
 
     public abstract BalanceDAO getBalances();
+
+    public abstract BadgeServiceDAO getBadgeService();
 }

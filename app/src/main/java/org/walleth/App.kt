@@ -21,8 +21,10 @@ import org.ligi.tracedroid.TraceDroid
 import org.walleth.contracts.FourByteDirectory
 import org.walleth.contracts.FourByteDirectoryImpl
 import org.walleth.core.EtherScanService
+import org.walleth.core.HitconBadgeService
 import org.walleth.core.TransactionNotificationService
 import org.walleth.data.AppDatabase
+import org.walleth.data.BadgeProvider
 import org.walleth.data.addressbook.AddressBookEntry
 import org.walleth.data.addressbook.allPrePopulationAddresses
 import org.walleth.data.config.KotprefSettings
@@ -69,6 +71,7 @@ open class App : MultiDexApplication(), KodeinAware {
         return Kodein.Module {
             bind<ExchangeRateProvider>() with singleton { CryptoCompareExchangeProvider(this@App, instance()) }
             bind<SyncProgressProvider>() with singleton { SyncProgressProvider() }
+            bind<BadgeProvider>() with singleton { BadgeProvider() }
             bind<WallethKeyStore>() with singleton { gethBackedWallethKeyStore }
             bind<Settings>() with singleton { KotprefSettings }
 
@@ -136,6 +139,7 @@ open class App : MultiDexApplication(), KodeinAware {
         try {
             startService(Intent(this, EtherScanService::class.java))
             startService(Intent(this, TransactionNotificationService::class.java))
+            startService(Intent(this, HitconBadgeService::class.java))
         } catch (e: IllegalStateException) {
         }
     }
