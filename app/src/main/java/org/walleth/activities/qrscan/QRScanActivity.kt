@@ -8,11 +8,15 @@ import kotlinx.android.synthetic.main.activity_scan.*
 import org.walleth.R
 
 const val REQUEST_CODE = 0x00006983
+const val KEY_SCAN_RESULT = "SCAN_RESULT"
 
 fun startScanActivityForResult(activity: Activity, requestCode: Int = REQUEST_CODE) {
     val intent = Intent(activity, QRScanActivity::class.java)
     activity.startActivityForResult(intent, requestCode)
 }
+
+fun Intent.getScanResult() = this.getStringExtra(KEY_SCAN_RESULT)
+fun Intent.hasScanResult() = this.hasExtra(KEY_SCAN_RESULT)
 
 class QRScanActivity : AppCompatActivity() {
     private val videographer = Videographer(this).also {
@@ -50,7 +54,7 @@ class QRScanActivity : AppCompatActivity() {
 
     private fun finishWithResult(value: String) {
         val result = Intent()
-        result.putExtra("SCAN_RESULT", value)
+        result.putExtra(KEY_SCAN_RESULT, value)
         setResult(Activity.RESULT_OK, result)
         finish()
     }

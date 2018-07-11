@@ -11,6 +11,7 @@ import android.support.v7.widget.helper.ItemTouchHelper.LEFT
 import android.support.v7.widget.helper.ItemTouchHelper.RIGHT
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.CompoundButton
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
@@ -21,7 +22,6 @@ import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.ligi.kaxt.startActivityFromClass
 import org.walleth.R
-import org.walleth.activities.hitcon.HitconBadgeActivity
 import org.walleth.data.AppDatabase
 import org.walleth.data.addressbook.AddressBookEntry
 import org.walleth.data.config.Settings
@@ -44,6 +44,10 @@ abstract class BaseAddressBookActivity : AppCompatActivity() {
 
     abstract fun onAddressClick(addressEntry: AddressBookEntry)
 
+    open fun onFabClick() {
+        startActivityFromClass(CreateAccountActivity::class.java)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -54,8 +58,8 @@ abstract class BaseAddressBookActivity : AppCompatActivity() {
 
         recycler_view.layoutManager = LinearLayoutManager(this)
 
-        fab.setOnClickListener {
-            startActivityFromClass(CreateAccountActivity::class.java)
+        fab.setOnClickListener{
+            onFabClick()
         }
 
         starred_only.isChecked = settings.filterAddressesStared

@@ -7,6 +7,7 @@ import org.walleth.data.transactions.TransactionSource
 import org.walleth.khex.hexToByteArray
 import org.walleth.khex.toHexString
 import java.math.BigInteger
+import java.sql.Timestamp
 import java.util.*
 
 class RoomTypeConverters {
@@ -63,4 +64,13 @@ class RoomTypeConverters {
     @TypeConverter
     fun toTransactionSourceString(value: List<Byte>) = value.toByteArray().toHexString()
 
+    @TypeConverter
+    fun fromTimestamp(value: Timestamp) = value.toString()
+    @TypeConverter
+    fun toTimestamp(value: String) = Timestamp.valueOf(value)
+
+    @TypeConverter
+    fun fromUUID(value: UUID?) = value.toString()
+    @TypeConverter
+    fun toUUID(value: String?) = if(value == null) null else UUID.fromString(value)
 }

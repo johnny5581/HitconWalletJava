@@ -16,15 +16,14 @@ import com.squareup.leakcanary.LeakCanary
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
 import okhttp3.OkHttpClient
+import org.hitcon.BadgeProvider
 import org.kethereum.model.Address
 import org.ligi.tracedroid.TraceDroid
 import org.walleth.contracts.FourByteDirectory
 import org.walleth.contracts.FourByteDirectoryImpl
 import org.walleth.core.EtherScanService
-import org.walleth.core.HitconBadgeService
 import org.walleth.core.TransactionNotificationService
 import org.walleth.data.AppDatabase
-import org.walleth.data.BadgeProvider
 import org.walleth.data.addressbook.AddressBookEntry
 import org.walleth.data.addressbook.allPrePopulationAddresses
 import org.walleth.data.config.KotprefSettings
@@ -41,6 +40,7 @@ import org.walleth.data.syncprogress.SyncProgressProvider
 import org.walleth.data.tokens.CurrentTokenProvider
 import org.walleth.util.DelegatingSocketFactory
 import java.net.Socket
+import java.security.KeyStore
 import javax.net.SocketFactory
 
 open class App : MultiDexApplication(), KodeinAware {
@@ -71,12 +71,10 @@ open class App : MultiDexApplication(), KodeinAware {
         return Kodein.Module {
             bind<ExchangeRateProvider>() with singleton { CryptoCompareExchangeProvider(this@App, instance()) }
             bind<SyncProgressProvider>() with singleton { SyncProgressProvider() }
-            bind<BadgeProvider>() with singleton { BadgeProvider() }
+            bind<BadgeProvider>() with singleton { BadgeProvider(applicationContext, instance()) }
             bind<WallethKeyStore>() with singleton { gethBackedWallethKeyStore }
             bind<Settings>() with singleton { KotprefSettings }
-
             bind<CurrentTokenProvider>() with singleton { CurrentTokenProvider(instance()) }
-
             bind<AppDatabase>() with singleton { Room.databaseBuilder(applicationContext, AppDatabase::class.java, "maindb").build() }
             bind<NetworkDefinitionProvider>() with singleton { NetworkDefinitionProvider(instance()) }
             bind<CurrentAddressProvider>() with singleton { InitializingCurrentAddressProvider(gethBackedWallethKeyStore, instance(), instance(), applicationContext) }
@@ -139,7 +137,6 @@ open class App : MultiDexApplication(), KodeinAware {
         try {
             startService(Intent(this, EtherScanService::class.java))
             startService(Intent(this, TransactionNotificationService::class.java))
-            startService(Intent(this, HitconBadgeService::class.java))
         } catch (e: IllegalStateException) {
         }
     }

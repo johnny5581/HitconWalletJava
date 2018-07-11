@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 1,
-    "identityHash": "72e71d7edbc679f4e1ffdee6806c7222",
+    "version": 2,
+    "identityHash": "d83ae7d8220d7211bdc57450c208e36e",
     "entities": [
       {
         "tableName": "addressbook",
@@ -341,7 +341,7 @@
       },
       {
         "tableName": "badge",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identify` TEXT NOT NULL, `address` TEXT, `name` TEXT, `last_use_time` TEXT NOT NULL, PRIMARY KEY(`identify`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identify` TEXT NOT NULL, `key` TEXT NOT NULL, `address` TEXT NOT NULL, `name` TEXT, `last_use_time` TEXT NOT NULL, PRIMARY KEY(`identify`))",
         "fields": [
           {
             "fieldPath": "identify",
@@ -350,10 +350,16 @@
             "notNull": true
           },
           {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
             "fieldPath": "address",
             "columnName": "address",
             "affinity": "TEXT",
-            "notNull": false
+            "notNull": true
           },
           {
             "fieldPath": "name",
@@ -379,7 +385,7 @@
       },
       {
         "tableName": "badge_service",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identify` TEXT NOT NULL, `name` TEXT NOT NULL, `uuid` TEXT, PRIMARY KEY(`identify`, `name`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`identify` TEXT NOT NULL, `name` TEXT NOT NULL, `service` TEXT, PRIMARY KEY(`identify`, `name`))",
         "fields": [
           {
             "fieldPath": "identify",
@@ -394,8 +400,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "uuid",
-            "columnName": "uuid",
+            "fieldPath": "service",
+            "columnName": "service",
             "affinity": "TEXT",
             "notNull": false
           }
@@ -413,7 +419,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, \"72e71d7edbc679f4e1ffdee6806c7222\")"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, \"d83ae7d8220d7211bdc57450c208e36e\")"
     ]
   }
 }

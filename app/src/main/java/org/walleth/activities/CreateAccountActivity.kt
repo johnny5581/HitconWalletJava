@@ -13,6 +13,9 @@ import kotlinx.android.synthetic.main.activity_account_create.*
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
+import org.hitcon.activities.*
+import org.hitcon.data.qrcode.isHitconQrCodeUri
+import org.hitcon.data.qrcode.toHitconQrCode
 import org.kethereum.erc55.withERC55Checksum
 import org.kethereum.erc681.isEthereumURLString
 import org.kethereum.erc681.parseERC681
@@ -21,9 +24,6 @@ import org.kethereum.model.Address
 import org.ligi.kaxtui.alert
 import org.walleth.R
 import org.walleth.R.string.*
-import org.walleth.activities.hitcon.HitconBadgeGetAddressActivity
-import org.walleth.activities.hitcon.getBadgeAddressResult
-import org.walleth.activities.hitcon.hasBadgeAddressResult
 import org.walleth.activities.qrscan.startScanActivityForResult
 import org.walleth.activities.trezor.TrezorGetAddressActivity
 import org.walleth.activities.trezor.getAddressResult
@@ -96,8 +96,8 @@ class CreateAccountActivity : AppCompatActivity() {
             startActivityForResult(Intent(this, TrezorGetAddressActivity::class.java), REQUEST_CODE_TREZOR)
         }
 
-        add_badge.setOnClickListener{
-            startActivityForResult(Intent(this, HitconBadgeGetAddressActivity::class.java), REQUEST_CODE_BADGE)
+        add_badge.setOnClickListener {
+            onBadgeClick()
         }
         new_address_button.setOnClickListener {
             cleanupGeneratedKeyWhenNeeded()
@@ -110,7 +110,23 @@ class CreateAccountActivity : AppCompatActivity() {
         camera_button.setOnClickListener {
             startScanActivityForResult(this)
         }
+
+        if (intent.hasHitconQrCode()) {
+            add_badge.callOnClick()
+        }
     }
+
+    private fun onBadgeClick() {
+
+        if (intent.hasHitconQrCode()) {
+            startActivityForResult(Intent(this, HitconBadgeActivity::class.java).apply {
+                putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
+            }, REQUEST_CODE_BADGE)
+        } else {
+            startScanActivityForResult(this)
+        }
+    }
+
 
     private fun cleanupGeneratedKeyWhenNeeded() {
         lastCreatedAddress?.let {
@@ -126,22 +142,34 @@ class CreateAccountActivity : AppCompatActivity() {
 
         data?.run {
             getStringExtra("SCAN_RESULT")?.let { stringExtra ->
-                val address = if (stringExtra.isEthereumURLString()) {
-                    parseERC681(stringExtra).address
+                if (stringExtra.isHitconQrCodeUri()) {
+                    var code = stringExtra.toHitconQrCode()
+                    if (code.valid)
+                        intent.putExtra(KeyHitconQrCode, code)
+                    onBadgeClick()
                 } else {
-                    stringExtra
+                    val address = if (stringExtra.isEthereumURLString()) {
+                        parseERC681(stringExtra).address
+                    } else {
+                        stringExtra
+                    }
+                    if (address != null) {
+                        setAddressFromExternalApplyingChecksum(address)
+                        if(nameInput.text.isBlank())
+                            nameInput.setText("Hitcon Badge")
+                        if(noteInput.text.isBlank())
+                            noteInput.setText("Hitcon hardware badge wallet")
+                    }
                 }
-                if (address != null) {
-                    setAddressFromExternalApplyingChecksum(address)
-                }
+
             }
 
             if (hasAddressResult()) {
                 trezorPath = getPATHResult()
                 setAddressFromExternalApplyingChecksum(getAddressResult())
-            }
-            else if(hasBadgeAddressResult()) {
-                setAddressFromExternalApplyingChecksum(getBadgeAddressResult())
+            } else if (hasBadgeAddress()) {
+                isBadge = true
+                setAddressFromExternalApplyingChecksum(getBadgeAddress())
             }
         }
     }
@@ -150,7 +178,7 @@ class CreateAccountActivity : AppCompatActivity() {
         if (Address(addressHex).isValid()) {
             hexInput.setText(Address(addressHex).withERC55Checksum().hex)
         } else {
-            alert(getString(R.string.warning_not_a_valid_address, addressHex),getString(R.string.title_invalid_address_alert))
+            alert(getString(R.string.warning_not_a_valid_address, addressHex), getString(R.string.title_invalid_address_alert))
         }
     }
 

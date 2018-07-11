@@ -21,6 +21,9 @@ import com.github.salomonbrys.kodein.instance
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main_in_drawer_container.*
 import kotlinx.android.synthetic.main.value.*
+import org.hitcon.activities.KeyHitconQrCode
+import org.hitcon.data.qrcode.HitconQrCodeType
+import org.hitcon.data.qrcode.toHitconQrCode
 import org.json.JSONObject
 import org.kethereum.erc681.ERC681
 import org.kethereum.erc681.generateURL
@@ -79,7 +82,17 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         setCurrentBalanceObservers()
 
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        if (clipboard.hasPrimaryClip()) {
+
+
+        val code = intent?.data?.toHitconQrCode()
+        if (code != null) {
+            when (code?.type) {
+                HitconQrCodeType.Initialize -> {
+                    startActivity(Intent(baseContext, AddressBookActivity::class.java).apply { putExtra(KeyHitconQrCode, code) })
+                    return
+                }
+            }
+        } else if (clipboard.hasPrimaryClip()) {
             val item = clipboard.primaryClip.getItemAt(0).text?.toString()
             val erc681 = item?.toERC681()
             if (erc681?.valid == true && erc681?.address != null && item != lastPastedData && item != currentAddressProvider.value?.hex.let { ERC681(address = it).generateURL() }) {
@@ -287,7 +300,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             balanceLiveData = appDatabase.balances.getBalanceLive(currentAddress, currentTokenProvider.currentToken.address, networkDefinitionProvider.getCurrent().chain)
             balanceLiveData?.observe(this, balanceObserver)
             etherLiveData?.removeObserver(etherObserver)
-            etherLiveData = appDatabase.balances.getBalanceLive(currentAddress, getEthTokenForChain(networkDefinitionProvider.getCurrent()).address, networkDefinitionProvider.getCurrent().chain )
+            etherLiveData = appDatabase.balances.getBalanceLive(currentAddress, getEthTokenForChain(networkDefinitionProvider.getCurrent()).address, networkDefinitionProvider.getCurrent().chain)
             etherLiveData?.observe(this, etherObserver)
         }
     }

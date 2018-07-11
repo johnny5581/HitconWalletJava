@@ -1,6 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="org.hitcon.activities.HitconBadgeActivity">
+    <android.support.v7.widget.AppCompatImageView
+        android:id="@+id/hitcon_badge"
+        app:srcCompat="@drawable/ic_badge"
+        android:layout_centerInParent="true"
+        android:layout_width="128dp"
+        android:layout_height="128dp"/>
 
-</LinearLayout>
+    <TextView
+        android:id="@+id/hitcon_badge_status"
+        android:text="please connect hitcon badge"
+        android:layout_below="@id/hitcon_badge"
+        android:layout_centerHorizontal="true"
+        android:fontFamily="sans-serif"
+        android:textSize="18dp"
+        android:gravity="center_horizontal"
+        android:padding="32dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <ProgressBar
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:visibility="invisible"/>
+</RelativeLayout>

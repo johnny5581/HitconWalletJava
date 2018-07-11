@@ -11,6 +11,7 @@ import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
 import kotlinx.android.synthetic.main.activity_main_in_drawer_container.view.*
 import kotlinx.android.synthetic.main.navigation_drawer_header.view.*
+import org.hitcon.activities.HitconBadgeActivity
 import org.ligi.kaxt.startActivityFromClass
 import org.walleth.R
 import org.walleth.activities.*
@@ -46,7 +47,8 @@ class WalletNavigationFragment : Fragment() {
                 R.id.menu_keys to KeysActivity::class,
                 R.id.menu_accounts to SwitchAccountActivity::class,
                 R.id.menu_offline_transaction to OfflineTransactionActivity::class,
-                R.id.menu_settings to PreferenceActivity::class
+                R.id.menu_settings to PreferenceActivity::class,
+                R.id.menu_badge to HitconBadgeActivity::class
         )
 
 

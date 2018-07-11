@@ -92,12 +92,12 @@ class OfflineTransactionActivity : AppCompatActivity() {
             val from = json.getString("from")
             val currentAccount = currentAddressProvider.getCurrent().hex
             if (from.clean0xPrefix().toLowerCase() != currentAccount.clean0xPrefix().toLowerCase()) {
-                alert("The from field of the transaction ($from) does not match your current account ($currentAccount)")
+                alert("The from field of the transaction ($from) does not match your entity account ($currentAccount)")
                 return
             }
             val chainId = json.getLong("chainId")
             if (chainId != networkDefinitionProvider.getCurrent().chain.id) {
-                alert("The chainId of the transaction ($chainId) does not match your current chainId")
+                alert("The chainId of the transaction ($chainId) does not match your entity chainId")
                 return
             }
 

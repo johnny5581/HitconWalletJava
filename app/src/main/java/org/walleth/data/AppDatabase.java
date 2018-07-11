@@ -5,15 +5,17 @@ import android.arch.persistence.room.RoomDatabase;
 import android.arch.persistence.room.TypeConverters;
 import org.walleth.data.addressbook.AddressBookDAO;
 import org.walleth.data.addressbook.AddressBookEntry;
+import org.hitcon.data.badge.BadgeDAO;
+import org.hitcon.data.badge.BadgeEntity;
+import org.hitcon.data.badge.BadgeServiceEntity;
 import org.walleth.data.balances.Balance;
 import org.walleth.data.balances.BalanceDAO;
-import org.walleth.data.ble.BadgeServiceDAO;
 import org.walleth.data.tokens.Token;
 import org.walleth.data.tokens.TokenDAO;
 import org.walleth.data.transactions.TransactionDAO;
 import org.walleth.data.transactions.TransactionEntity;
 
-@Database(entities = {AddressBookEntry.class, Token.class, Balance.class, TransactionEntity.class}, version = 1)
+@Database(entities = {AddressBookEntry.class, Token.class, Balance.class, TransactionEntity.class, BadgeEntity.class, BadgeServiceEntity.class}, version = 1)
 @TypeConverters({RoomTypeConverters.class})
 public abstract class AppDatabase extends RoomDatabase {
 
@@ -25,5 +27,5 @@ public abstract class AppDatabase extends RoomDatabase {
 
     public abstract BalanceDAO getBalances();
 
-    public abstract BadgeServiceDAO getBadgeService();
+    public abstract BadgeDAO getBadges();
 }

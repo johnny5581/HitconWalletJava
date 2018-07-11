@@ -30,5 +30,8 @@
             android:id="@+id/menu_debug"
             android:title="Debug"
             android:icon="@drawable/ic_adb_black_24dp"/>
-
+    <item
+        android:id="@+id/menu_badge"
+        android:title="Badge"
+        android:icon="@drawable/ic_lock_black_24dp"/>
 </menu>
