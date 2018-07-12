@@ -38,7 +38,7 @@ class HitconBadgeActivity : AppCompatActivity() {
     companion object {
         const val ReceiveTxn = 0
         const val Txn = "TXN"
-        const val REQ_PERMISSION = 1000
+        const val REQUEST_LOCALE = 1000
     }
 
     private val badgeProvider: BadgeProvider by LazyKodein(appKodein).instance()
@@ -93,17 +93,14 @@ class HitconBadgeActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
-        var permissions = ArrayList<String>()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-            permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        if (permissions.size > 0)
-            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), REQ_PERMISSION)
-        else
-            inited = true
 
-        if (!inited) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
+//        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+//            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCALE)
+
+
+
 
 
         //if entity is not null, check device
@@ -121,25 +118,27 @@ class HitconBadgeActivity : AppCompatActivity() {
 
         if (intent.hasHitconQrCode()) {
             val init = InitializeContent(intent.getHitconQrCode().data)
-            badgeProvider.initializeBadge(init)
-            setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
-            finish()
+            badgeProvider.initializeBadge(init, object: BadgeProvider.BadgeCallback {
+                override fun onServiceDiscover() {
+                    setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
+                    finish()
+                }
+
+                override fun onTimeout() {
+                    finish()
+                }
+
+                override fun onDeviceFound(device: BluetoothDevice) {
+
+                }
+            })
+
         }
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(receiverTxn)
-    }
-
-    private val onDeviceFoundCallback = object : BadgeProvider.LeScanCallback {
-        override fun onTimeout() {
-            Toast.makeText(this@HitconBadgeActivity, "Device not here, timeout!", Toast.LENGTH_SHORT).show()
-        }
-
-        override fun onDeviceFound(device: BluetoothDevice) {
-
-        }
     }
 
 
@@ -175,20 +174,14 @@ class HitconBadgeActivity : AppCompatActivity() {
         }
         else -> super.onOptionsItemSelected(item)
     }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        when (resultCode) {
-            REQ_PERMISSION ->
-                if (resultCode != Activity.RESULT_OK) {
-                    Toast.makeText(this, "Must have permission to use badge", Toast.LENGTH_SHORT).show()
-                    finish()
-                } else {
-                    startActivity(intent)
-                    finish()
-                }
-
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if(requestCode == REQUEST_LOCALE) {
+            if(grantResults.any{ it != PackageManager.PERMISSION_GRANTED }) {
+                Toast.makeText(this, "Need locale permission.", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }
-
-
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     }
 }

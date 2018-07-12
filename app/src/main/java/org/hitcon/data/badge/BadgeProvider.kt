@@ -10,7 +10,6 @@ import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
 import org.hitcon.data.badge.BadgeEntity
 import org.hitcon.data.badge.getLastBadge
-import org.hitcon.data.badge.upsertBadge
 import org.hitcon.data.qrcode.HitconBadgeServices
 import org.hitcon.data.qrcode.InitializeContent
 import org.walleth.data.AppDatabase
@@ -43,6 +42,8 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
         const val MessageStopScanDevices = 4
 
+        const val MessageStartScanGattService = 5
+
     }
 
     var entity: BadgeEntity? = null
@@ -54,7 +55,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
 
     private var scanDeviceCallback: BadgeScanCallback? = null
-    private val gattScanCallback: GattScanCallback = GattScanCallback(this)
+    private var gattScanCallback: GattScanCallback? = null
     private val delayStopScanRunnable = Runnable { stopScanDevice(true) }
 
     private var gatt: BluetoothGatt? = null
@@ -83,24 +84,31 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             }
             MessageGattConnectionChanged -> {
             }
+            MessageStartScanGattService-> {
+                device?.run {
+                    startConnectGatt()
+                }
+            }
         }
 
     }
 
 
-    interface LeScanCallback {
+    interface BadgeCallback {
         fun onDeviceFound(device: BluetoothDevice)
         fun onTimeout()
+        fun onServiceDiscover()
     }
 
 
-    private class BadgeScanCallback(val badgeProvider: BadgeProvider, val onDeviceFound: LeScanCallback?) : BluetoothAdapter.LeScanCallback {
+    private class BadgeScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothAdapter.LeScanCallback {
         override fun onLeScan(device: BluetoothDevice?, rssi: Int, scanRecord: ByteArray?) {
             var uuids = parseUUIDList(scanRecord!!)
-            if (uuids.first().toString() == badgeProvider.initializeContent?.service) {
+            if (uuids.size> 0 && uuids.first().toString() == badgeProvider.initializeContent?.service) {
                 badgeProvider.device = device
-                onDeviceFound?.onDeviceFound(device!!)
+                badgeCallback?.onDeviceFound(device!!)
                 badgeProvider.sendEmptyMessage(MessageStopScanDevices)
+                badgeProvider.sendEmptyMessage(MessageStartScanGattService)
             }
         }
 
@@ -142,7 +150,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
     }
 
-    private class GattScanCallback(val badgeProvider: BadgeProvider) : BluetoothGattCallback() {
+    private class GattScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
             badgeProvider.connected = newState == BluetoothGatt.STATE_CONNECTED
             badgeProvider.sendEmptyMessage(MessageGattConnectionChanged)
@@ -176,14 +184,23 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 badgeProvider.services.clear()
-                gatt?.services?.forEach {
-                    if (it?.uuid.toString() == badgeProvider.initializeContent?.service) {
-                        it.characteristics.forEach {
-                            var name = badgeProvider.initializeContent?.getUuidName(it.uuid)
+                for(service in gatt?.services!!) {
+                    var uuidstr = service.uuid.toString()
+//                    if (uuidstr == badgeProvider.initializeContent?.service) {
+//                        service.characteristics.forEach {
+//                            var name = badgeProvider.initializeContent?.getUuidName(it.uuid)
+//                            if (name != null)
+//                                badgeProvider.services[name] = it
+//                        }
+//                        badgeCallback?.onServiceDiscover()
+//                    }
+                    for(ch in service.characteristics) {
+                        var chstr = ch.uuid.toString()
+                        var name = badgeProvider.initializeContent?.getUuidName(ch.uuid)
                             if (name != null)
-                                badgeProvider.services[name] = it
-                        }
+                                badgeProvider.services[name] = ch
                     }
+                    badgeCallback?.onServiceDiscover()
                 }
             }
         }
@@ -214,7 +231,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     /**
      * Stat scan device, use initialize content
      */
-    fun startScanDevice(onDeviceFound: LeScanCallback? = null) {
+    fun startScanDevice(onDeviceFound: BadgeCallback? = null) {
         if (scanning) stopScanDevice()
         scanDeviceCallback = BadgeScanCallback(this, onDeviceFound)
         adapter.startLeScan(scanDeviceCallback)
@@ -228,7 +245,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private fun stopScanDevice(timeout: Boolean = false) {
         if (scanning && scanDeviceCallback != null) {
             if (timeout) {
-                scanDeviceCallback!!.onDeviceFound?.onTimeout()
+                scanDeviceCallback!!.badgeCallback?.onTimeout()
             } else {
                 removeCallbacks(delayStopScanRunnable)
             }
@@ -238,14 +255,15 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
     }
 
-    fun startConnectGatt() {
+    fun startConnectGatt(leScanCallback: BadgeCallback? = null) {
         if(connected) return
+        gattScanCallback = GattScanCallback(this, leScanCallback)
         device?.connectGatt(context, false, gattScanCallback)
     }
 
-    fun initializeBadge(initializeContent: InitializeContent) {
+    fun initializeBadge(initializeContent: InitializeContent, leScanCallback: BadgeCallback? = null) {
         this.initializeContent = initializeContent
-        startScanDevice()
+        startScanDevice(leScanCallback)
     }
 
 
