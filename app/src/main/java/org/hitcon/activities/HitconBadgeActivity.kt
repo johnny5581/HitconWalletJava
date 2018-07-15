@@ -25,6 +25,7 @@ import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.getTxn
 import org.walleth.R
 import org.walleth.activities.qrscan.KEY_SCAN_RESULT
+import org.walleth.kethereum.android.TransactionParcel
 
 
 const val KeyHitconQrCode = "hitcon_qr_code";
@@ -33,7 +34,8 @@ fun Intent.hasHitconQrCode() = this.hasExtra(KeyHitconQrCode)
 fun Intent.getHitconQrCode() = this.getParcelableExtra<HitconQrCode>(KeyHitconQrCode)!!
 fun Intent.hasBadgeAddress() = this.hasExtra(KeyHitconBadgeAddress)
 fun Intent.getBadgeAddress() = this.getStringExtra(KeyHitconBadgeAddress)
-
+fun Intent.hasTx() = this.hasExtra("TX")
+fun Intent.getTx() = this.getParcelableExtra<TransactionParcel>("TX").transaction
 class HitconBadgeActivity : AppCompatActivity() {
     companion object {
         const val ReceiveTxn = 0
@@ -120,20 +122,26 @@ class HitconBadgeActivity : AppCompatActivity() {
             val init = InitializeContent(intent.getHitconQrCode().data)
             badgeProvider.initializeBadge(init, object: BadgeProvider.BadgeCallback {
                 override fun onServiceDiscover() {
-                    setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
-                    finish()
+
+
+                    this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
+                    this@HitconBadgeActivity.finish()
                 }
 
                 override fun onTimeout() {
-                    finish()
+                    this@HitconBadgeActivity.finish()
                 }
 
                 override fun onDeviceFound(device: BluetoothDevice) {
 
                 }
             })
-
+        }else if(intent.hasTx()) {
+            //begin sign
+            badgeProvider.startTransaction(intent.getTx())
         }
+
+
     }
 
     override fun onPause() {

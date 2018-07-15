@@ -20,6 +20,7 @@ import kotlinx.android.synthetic.main.value.*
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
+import org.hitcon.activities.HitconBadgeActivity
 import org.kethereum.contract.abi.types.convertStringToABIType
 import org.kethereum.erc681.ERC681
 import org.kethereum.erc681.generateURL
@@ -106,6 +107,10 @@ class CreateTransactionActivity : AppCompatActivity() {
                 setAmountFromETHString(amount_input.text.toString())
                 onCurrentTokenChanged()
             }
+            6522 -> if (resultCode == Activity.RESULT_OK) {
+                storeDefaultGasPrice()
+            }
+
             else -> data?.let {
                 if (data.hasExtra("HEX")) {
                     setToFromURL(data.getStringExtra("HEX"), fromUser = true)
@@ -145,9 +150,10 @@ class CreateTransactionActivity : AppCompatActivity() {
                 appDatabase.addressBook.getByAddressAsync(address) {
                     from_address.text = it?.name
                     val isTrezorTransaction = it?.trezorDerivationPath != null
+                    val isBadgeTransaction = it?.hitconBadgeFlag!!
                     fab.setImageResource(if (isTrezorTransaction) R.drawable.trezor_icon_black else R.drawable.ic_action_done)
                     fab.setOnClickListener {
-                        onFabClick(isTrezorTransaction)
+                        onFabClick(isTrezorTransaction, isBadgeTransaction)
                     }
                 }
             }
@@ -253,7 +259,7 @@ class CreateTransactionActivity : AppCompatActivity() {
         }
     }
 
-    private fun onFabClick(isTrezorTransaction: Boolean) {
+    private fun onFabClick(isTrezorTransaction: Boolean, isBadgeTransaction: Boolean) {
         if (to_address.text.isEmpty() || currentToAddress == null) {
             alert(R.string.create_tx_error_address_must_be_specified)
         } else if (currentAmount == null && currentERC681?.function == null) {
@@ -264,16 +270,16 @@ class CreateTransactionActivity : AppCompatActivity() {
             alert(title = R.string.nonce_invalid, message = R.string.please_enter_name)
         } else {
             if (currentTokenProvider.currentToken.isETH() && currentERC681?.function == null && currentAmount == ZERO) {
-                question(R.string.create_tx_zero_amount, R.string.alert_problem_title, DialogInterface.OnClickListener({ _, _ -> startTransaction(isTrezorTransaction) }))
+                question(R.string.create_tx_zero_amount, R.string.alert_problem_title, DialogInterface.OnClickListener({ _, _ -> startTransaction(isTrezorTransaction,isBadgeTransaction) }))
             } else if (!currentTokenProvider.currentToken.isETH() && currentAmount!! > currentBalanceSafely()) {
-                question(R.string.create_tx_negative_token_balance, R.string.alert_problem_title, DialogInterface.OnClickListener { _, _ -> startTransaction(isTrezorTransaction) })
+                question(R.string.create_tx_negative_token_balance, R.string.alert_problem_title, DialogInterface.OnClickListener { _, _ -> startTransaction(isTrezorTransaction,isBadgeTransaction) })
             } else {
-                startTransaction(isTrezorTransaction)
+                startTransaction(isTrezorTransaction, isBadgeTransaction)
             }
         }
     }
 
-    private fun startTransaction(isTrezorTransaction: Boolean) {
+    private fun startTransaction(isTrezorTransaction: Boolean, isBadgeTransaction: Boolean) {
         val transaction = (if (currentTokenProvider.currentToken.isETH()) createTransactionWithDefaults(
                 value = currentAmount?:ZERO,
                 to = currentToAddress!!,
@@ -308,6 +314,9 @@ class CreateTransactionActivity : AppCompatActivity() {
         when {
 
             isTrezorTransaction -> startTrezorActivity(TransactionParcel(transaction))
+            isBadgeTransaction -> startActivityForResult(Intent(this, HitconBadgeActivity::class.java).apply {
+                putExtra("TX", TransactionParcel(transaction))
+            }, 6522)
             else -> async(UI) {
                 async(CommonPool) {
                     appDatabase.transactions.upsert(transaction.toEntity(signatureData = null, transactionState = TransactionState()))
@@ -351,7 +360,7 @@ class CreateTransactionActivity : AppCompatActivity() {
             from_address.text = address.hex
             fab.setImageResource(R.drawable.ic_action_done)
             fab.setOnClickListener {
-                onFabClick(false)
+                onFabClick(false, false)
             }
             currentAddressProvider.setCurrent(address)
         }

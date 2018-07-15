@@ -6,16 +6,26 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
+import android.util.Log
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
+import org.ethereum.geth.BigInt
+import org.ethereum.geth.Transaction
 import org.hitcon.data.badge.BadgeEntity
+import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
+import org.hitcon.data.badge.upsertBadge
 import org.hitcon.data.qrcode.HitconBadgeServices
 import org.hitcon.data.qrcode.InitializeContent
+import org.hitcon.helper.toHex
 import org.walleth.data.AppDatabase
+import org.walleth.kethereum.geth.toBigInteger
+import org.walleth.khex.hexToByteArray
+import java.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
+import java.security.SecureRandom
 import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -61,7 +71,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private var gatt: BluetoothGatt? = null
     private var adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private var mtu = 512
-    private val iv: ByteArray = ByteArray(16)
+    private var iv: ByteArray = ByteArray(16)
 
     init {
         async(CommonPool) {
@@ -113,7 +123,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
 
         private fun parseUUIDList(bytes: ByteArray): ArrayList<UUID> {
-            var list = ArrayList<UUID>()
+            val list = ArrayList<UUID>()
             var offset = 0
             while (offset < bytes.size - 2) {
                 var len = bytes[offset++].toInt()
@@ -150,7 +160,10 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
     }
 
+
     private class GattScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothGattCallback() {
+
+
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
             badgeProvider.connected = newState == BluetoothGatt.STATE_CONNECTED
             badgeProvider.sendEmptyMessage(MessageGattConnectionChanged)
@@ -169,7 +182,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                     gatt?.discoverServices()
                 }
                 BluetoothGatt.GATT_FAILURE -> {
-                    var tmp = mtu / 2
+                    val tmp = mtu / 2
                     if (tmp < 128)
                         badgeProvider.sendMessage(Message().apply {
                             what = MessageMtuFailure
@@ -185,22 +198,16 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 badgeProvider.services.clear()
                 for(service in gatt?.services!!) {
-                    var uuidstr = service.uuid.toString()
-//                    if (uuidstr == badgeProvider.initializeContent?.service) {
-//                        service.characteristics.forEach {
-//                            var name = badgeProvider.initializeContent?.getUuidName(it.uuid)
-//                            if (name != null)
-//                                badgeProvider.services[name] = it
-//                        }
-//                        badgeCallback?.onServiceDiscover()
-//                    }
-                    for(ch in service.characteristics) {
-                        var chstr = ch.uuid.toString()
-                        var name = badgeProvider.initializeContent?.getUuidName(ch.uuid)
+                    if (service.uuid.toString() == badgeProvider.initializeContent?.service) {
+                        service.characteristics.forEach {
+                            var name = badgeProvider.initializeContent?.getUuidName(it.uuid)
                             if (name != null)
-                                badgeProvider.services[name] = ch
+                                badgeProvider.services[name] = it
+                        }
+
+                        badgeProvider.saveEntity()
+                        badgeCallback?.onServiceDiscover()
                     }
-                    badgeCallback?.onServiceDiscover()
                 }
             }
         }
@@ -221,11 +228,11 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     /**
      * Enable notification
      */
-    fun enableNotifications(characteristic: BluetoothGattCharacteristic): Boolean {
+    private fun enableNotifications(characteristic: BluetoothGattCharacteristic): Boolean {
         gatt?.setCharacteristicNotification(characteristic, true)
-        var desc = characteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+        val desc = characteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
         desc.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-        return gatt?.let { it.writeDescriptor(desc) } ?: false
+        return gatt?.writeDescriptor(desc) ?: false
     }
 
     /**
@@ -236,6 +243,20 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         scanDeviceCallback = BadgeScanCallback(this, onDeviceFound)
         adapter.startLeScan(scanDeviceCallback)
         postDelayed(delayStopScanRunnable, 10 * 1000)
+    }
+
+    fun saveEntity(){
+        val service = initializeContent!!.service
+        val address = initializeContent!!.address
+        val list = ArrayList<BadgeServiceEntity>()
+        for(kv in services) {
+            list.add(BadgeServiceEntity(service, kv.key.name, kv.value.uuid))
+        }
+        entity = BadgeEntity(service, address, services = list)
+        async(CommonPool) {
+            appDatabase.badges.upsertBadge(entity!!)
+        }
+
     }
 
 
@@ -254,6 +275,41 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             scanDeviceCallback = null
         }
     }
+
+    fun startTransaction(transaction: org.kethereum.model.Transaction) {
+        val hvalue = BigDecimal(transaction.value).toHex()
+        val hgaslimit = transaction.gasLimit.toBigDecimal().toHex()
+        val hgas = BigDecimal(transaction.gasPrice).toHex()
+        val hnoice = transaction.nonce?.toBigDecimal()?.toHex()
+        val hdata = transaction.txHash
+        val transArray = "01"+String.format("%02X", transaction.to.toString().length/2)+transaction.to.toString() +
+                "02"+String.format("%02X", hvalue.length/2)+hvalue+
+                "03"+String.format("%02X", hgas.length/2)+hgas+
+                "04"+String.format("%02X", hgaslimit.length/2)+hgaslimit+
+                "05"+String.format("%02X", hnoice!!.length/2)+hnoice+
+                "06"+String.format("%02X", hdata!!.length/2)+hdata
+
+        SecureRandom(iv)
+        val aeskey = initializeContent?.key?.hexToByteArray()
+        val ptext = transArray.hexToByteArray()
+        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
+        val cha = services[HitconBadgeServices.Transaction]
+        cha?.value = enc
+        gatt?.setCharacteristicNotification(cha!!, true)
+        enableNotifications(services[HitconBadgeServices.Txn]!!)
+    }
+
+
+
+
+    private fun BigDecimal.toHex() : String {
+        var result = String.format("%X", this.toBigInteger())
+        if(result.length%2 == 1)
+            result = "0$result"
+        return result
+    }
+
+
 
     fun startConnectGatt(leScanCallback: BadgeCallback? = null) {
         if(connected) return
