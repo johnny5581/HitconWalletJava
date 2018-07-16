@@ -21,7 +21,7 @@ object KotprefSettings : KotprefModel(), Settings {
     override var filterAddressesStared by booleanPref(default = false)
     override var filterAddressesKeyOnly by booleanPref(default = false)
 
-    override var chain by longPref(RINKEBY_CHAIN_ID)
+    override var chain by longPref(3L)
     override var accountAddress by nullableStringPref(null)
 
     override var addressInitVersion by intPref(0)

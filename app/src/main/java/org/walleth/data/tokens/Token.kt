@@ -6,6 +6,7 @@ import org.kethereum.model.ChainDefinition
 import org.walleth.data.networks.NetworkDefinition
 
 fun Token.isETH() = address.hex == "0x0"
+fun Token.isHITCON() = address.hex == ""
 
 fun getEthTokenForChain(networkDefinition: NetworkDefinition) = Token(
         symbol = "ETH",
@@ -18,6 +19,19 @@ fun getEthTokenForChain(networkDefinition: NetworkDefinition) = Token(
         fromUser = false,
         order = 0
 )
+
+fun getHitconTokenForChain(networkDefinition: NetworkDefinition) = Token(
+        symbol = "HITCON",
+        name = "HITCON Coin",
+        decimals = 18,
+        address = Address("0x1234567890123456"),
+        chain = networkDefinition.chain,
+        showInList = true,
+        starred = true,
+        fromUser = true,
+        order = 0
+)
+
 
 @Entity(tableName = "tokens", primaryKeys = arrayOf("address", "chain"))
 data class Token(
