@@ -218,7 +218,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                 for(service in gatt?.services!!) {
                     if (service.uuid.toString() == badgeProvider.entity?.identify) {
                         service.characteristics.forEach {
-                            var name = badgeProvider.entity?.services
+                            var name = badgeProvider.entity?.getUuidName(it.uuid)
                             if (name != null)
                                 badgeProvider.services[name] = it
                         }
@@ -264,17 +264,16 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     }
 
     fun saveEntity(){
-        val service = initializeContent!!.service
-        val address = initializeContent!!.address
-        val list = ArrayList<BadgeServiceEntity>()
-        for(kv in services) {
-            list.add(BadgeServiceEntity(service, kv.key.name, kv.value.uuid))
-        }
-        entity = BadgeEntity(service, address, services = list)
+//        val service = initializeContent!!.service
+//        val address = initializeContent!!.address
+//        val list = ArrayList<BadgeServiceEntity>()
+//        for(kv in services) {
+//            list.add(BadgeServiceEntity(service, kv.key.name, kv.value.uuid))
+//        }
+//        entity = BadgeEntity(service, address, services = list)
         async(CommonPool) {
             appDatabase.badges.upsertBadge(entity!!)
         }
-
     }
 
 
@@ -308,7 +307,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                 "06"+String.format("%02X", hdata!!.length/2)+hdata
 
         SecureRandom(iv)
-        val aeskey = initializeContent?.key?.hexToByteArray()
+        val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
         val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
         val cha = services[HitconBadgeServices.Transaction]
@@ -337,7 +336,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
     fun initializeBadge(init: InitializeContent, leScanCallback: BadgeCallback? = null) {
         //this.initializeContent = initializeContent
-        entity = BadgeEntity(init.service, init.address, services = getServiceEntityList(init.service))
+        entity = BadgeEntity(init.service, init.address, key=init.key, services = getServiceEntityList(init.service))
 
         startScanDevice(leScanCallback)
     }
@@ -345,7 +344,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
 
     private fun getDecryptText(cyber: ByteArray) : String {
-        return decrypt(iv, initializeContent!!.key.toByteArray(), cyber).toString(Charset.defaultCharset())
+        return decrypt(iv, entity!!.key!!.toByteArray(), cyber).toString(Charset.defaultCharset())
     }
 
 

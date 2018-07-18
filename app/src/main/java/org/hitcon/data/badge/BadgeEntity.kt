@@ -19,6 +19,8 @@ data class BadgeEntity(
 
         var name: String? = null,
 
+        var key: String? = null,
+
         @ColumnInfo(name = "last_use_time")
         var lastusetime: Timestamp = Timestamp(System.currentTimeMillis()),
 
@@ -27,8 +29,12 @@ data class BadgeEntity(
 )
 {
         fun getUuidName(uuid: UUID) : HitconBadgeServices? {
-                return services?.firstOrNull { t-> true }
+                var name= services?.firstOrNull { t -> t.uuid == uuid }?.name
+                if(name != null)
+                        return HitconBadgeServices.valueOf(name)
+                return null
         }
+
 }
 
 
