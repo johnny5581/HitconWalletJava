@@ -1,25 +1,14 @@
 package org.hitcon.data.qrcode
 
+import org.hitcon.BadgeProvider.Companion.serviceNames
+import org.hitcon.HitconBadgeServices
 import java.util.*
 
-enum class HitconBadgeServices {
-    Transaction,
-    Txn,
-    AddERC20,
-    Balance,
-    GeneralPurposeCmd,
-    GeneralPurposeData
-}
+
 
 data class InitializeContent(val address: String, val key: String, val service: String, val characteristics: String) {
     companion object {
-        val serviceNames = arrayOf(
-                HitconBadgeServices.Transaction,
-                HitconBadgeServices.Txn,
-                HitconBadgeServices.AddERC20,
-                HitconBadgeServices.Balance,
-                HitconBadgeServices.GeneralPurposeCmd,
-                HitconBadgeServices.GeneralPurposeData)
+
     }
     constructor(data: Map<String, String>) : this(
             data.getValue("a"),

@@ -15,7 +15,6 @@ import org.hitcon.data.badge.BadgeEntity
 import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
 import org.hitcon.data.badge.upsertBadge
-import org.hitcon.data.qrcode.HitconBadgeServices
 import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.helper.toHex
 import org.walleth.data.AppDatabase
@@ -36,6 +35,16 @@ fun Intent.hasTxn() = this.hasExtra(KeyTxn)
 fun Intent.getTxn() = this.getStringExtra(KeyTxn)
 const val KeyTxn = "Txn"
 const val KeyMtu = "Mtu"
+
+enum class HitconBadgeServices {
+    Transaction,
+    Txn,
+    AddERC20,
+    Balance,
+    GeneralPurposeCmd,
+    GeneralPurposeData
+}
+
 /**
  * Hitcon Badge Service Provider
  */
@@ -43,17 +52,18 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     companion object {
         const val MessageReceiveTxn = 1
         const val ActionReceiveTxn = "Action_ReceiveTxn"
-
-
         const val MessageGattConnectionChanged = 2
-
         const val MessageMtuFailure = 3
-
-
         const val MessageStopScanDevices = 4
-
         const val MessageStartScanGattService = 5
 
+        val serviceNames = arrayOf(
+                HitconBadgeServices.Transaction,
+                HitconBadgeServices.Txn,
+                HitconBadgeServices.AddERC20,
+                HitconBadgeServices.Balance,
+                HitconBadgeServices.GeneralPurposeCmd,
+                HitconBadgeServices.GeneralPurposeData)
     }
 
     var entity: BadgeEntity? = null
@@ -61,7 +71,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     var scanning: Boolean = false
     val services: LinkedHashMap<HitconBadgeServices, BluetoothGattCharacteristic> = LinkedHashMap()
     var connected: Boolean = false
-    var initializeContent: InitializeContent? = null
+    //var initializeContent: InitializeContent? = null
 
 
     private var scanDeviceCallback: BadgeScanCallback? = null
@@ -76,6 +86,8 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     init {
         async(CommonPool) {
             entity = appDatabase.badges.getLastBadge()
+            if(entity != null)
+                startScanDevice()
         }
     }
 
@@ -110,11 +122,17 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         fun onServiceDiscover()
     }
 
+    private fun getServiceEntityList(service: String) : List<BadgeServiceEntity> {
+        val list = ArrayList<BadgeServiceEntity>()
+        for(name in serviceNames)
+            list.add(BadgeServiceEntity(service, name.name))
+        return list
+    }
 
     private class BadgeScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothAdapter.LeScanCallback {
         override fun onLeScan(device: BluetoothDevice?, rssi: Int, scanRecord: ByteArray?) {
             var uuids = parseUUIDList(scanRecord!!)
-            if (uuids.size> 0 && uuids.first().toString() == badgeProvider.initializeContent?.service) {
+            if (uuids.size> 0 && uuids.first().toString() == badgeProvider.entity?.identify) {
                 badgeProvider.device = device
                 badgeCallback?.onDeviceFound(device!!)
                 badgeProvider.sendEmptyMessage(MessageStopScanDevices)
@@ -198,9 +216,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 badgeProvider.services.clear()
                 for(service in gatt?.services!!) {
-                    if (service.uuid.toString() == badgeProvider.initializeContent?.service) {
+                    if (service.uuid.toString() == badgeProvider.entity?.identify) {
                         service.characteristics.forEach {
-                            var name = badgeProvider.initializeContent?.getUuidName(it.uuid)
+                            var name = badgeProvider.entity?.services
                             if (name != null)
                                 badgeProvider.services[name] = it
                         }
@@ -317,8 +335,10 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         device?.connectGatt(context, false, gattScanCallback)
     }
 
-    fun initializeBadge(initializeContent: InitializeContent, leScanCallback: BadgeCallback? = null) {
-        this.initializeContent = initializeContent
+    fun initializeBadge(init: InitializeContent, leScanCallback: BadgeCallback? = null) {
+        //this.initializeContent = initializeContent
+        entity = BadgeEntity(init.service, init.address, services = getServiceEntityList(init.service))
+
         startScanDevice(leScanCallback)
     }
 

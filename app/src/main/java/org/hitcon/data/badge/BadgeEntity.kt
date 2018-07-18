@@ -4,6 +4,8 @@ import android.arch.persistence.room.ColumnInfo
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.Ignore
 import android.arch.persistence.room.PrimaryKey
+import org.hitcon.BadgeProvider
+import org.hitcon.HitconBadgeServices
 import org.jetbrains.annotations.NotNull
 import java.sql.Timestamp
 import java.util.*
@@ -23,6 +25,12 @@ data class BadgeEntity(
         @Ignore
         var services: List<BadgeServiceEntity>? = null
 )
+{
+        fun getUuidName(uuid: UUID) : HitconBadgeServices? {
+                return services?.firstOrNull { t-> true }
+        }
+}
+
 
 
 
