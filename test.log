@@ -1,0 +1,72 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Download https://jcenter.bintray.com/org/apache/maven/maven-plugin-api/2.0.6/maven-plugin-api-2.0.6.pom
+Download https://jcenter.bintray.com/org/apache/maven/maven/2.0.6/maven-2.0.6.pom
+Download https://jcenter.bintray.com/org/apache/maven/maven-parent/5/maven-parent-5.pom
+Download https://jcenter.bintray.com/org/codehaus/plexus/plexus-utils/1.5.8/plexus-utils-1.5.8.pom
+
+> Configure project :
+POM relocation to an other version number is not fully supported in Gradle : xml-apis:xml-apis:2.0.2 relocated to xml-apis:xml-apis:1.0.b2.
+Please update your dependency to directly use the correct version 'xml-apis:xml-apis:1.0.b2'.
+Resolution will only pick dependencies of the relocated element.  Artifacts and other metadata will be ignored.
+
+> Configure project :app
+WARNING: Configuration 'compile' is obsolete and has been replaced with 'implementation' and 'api'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'androidTestCompile' is obsolete and has been replaced with 'androidTestImplementation' and 'androidTestApi'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'androidTestApi' is obsolete and has been replaced with 'androidTestImplementation'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'withGethCompile' is obsolete and has been replaced with 'withGethImplementation' and 'withGethApi'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'testCompile' is obsolete and has been replaced with 'testImplementation' and 'testApi'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'testApi' is obsolete and has been replaced with 'testImplementation'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'debugCompile' is obsolete and has been replaced with 'debugImplementation' and 'debugApi'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+WARNING: Configuration 'releaseCompile' is obsolete and has been replaced with 'releaseImplementation' and 'releaseApi'.
+It will be removed at the end of 2018. For more information see: http://d.android.com/r/tools/update-dependency-configurations.html
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preWithGethNoFirebaseForFDroidDebugBuild
+> Task :app:unMock
+> Task :app:compileWithGethNoFirebaseForFDroidDebugAidl
+> Task :app:compileWithGethNoFirebaseForFDroidDebugRenderscript
+> Task :app:checkWithGethNoFirebaseForFDroidDebugManifest
+> Task :app:generateWithGethNoFirebaseForFDroidDebugBuildConfig
+> Task :app:mainApkListPersistenceWithGethNoFirebaseForFDroidDebug
+> Task :app:generateWithGethNoFirebaseForFDroidDebugResValues
+> Task :app:generateWithGethNoFirebaseForFDroidDebugResources
+> Task :app:mergeWithGethNoFirebaseForFDroidDebugResources
+> Task :app:createWithGethNoFirebaseForFDroidDebugCompatibleScreenManifests
+> Task :app:processWithGethNoFirebaseForFDroidDebugManifest
+> Task :app:splitsDiscoveryTaskWithGethNoFirebaseForFDroidDebug
+> Task :app:processWithGethNoFirebaseForFDroidDebugResources
+> Task :app:kaptGenerateStubsWithGethNoFirebaseForFDroidDebugKotlin
+w: warning: Supported source version 'RELEASE_7' from annotation processor 'org.jetbrains.kotlin.kapt3.base.ProcessorWrapper' less than -source '1.8'
+w: C:\Projects\Wallet\app\build\tmp\kapt3\stubs\withGethNoFirebaseForFDroidDebug\org\walleth\data\transactions\TransactionState.java:6: warning: There are multiple good constructors and Room will pick the no-arg constructor. You can use the @Ignore annotation to eliminate unwanted constructors.
+public final class TransactionState {
+             ^
+w: C:\Projects\Wallet\app\build\tmp\kapt3\stubs\withGethNoFirebaseForFDroidDebug\org\walleth\data\transactions\TransactionState.java:6: warning: There are multiple good constructors and Room will pick the no-arg constructor. You can use the @Ignore annotation to eliminate unwanted constructors.
+public final class TransactionState {
+             ^
+> Task :app:kaptWithGethNoFirebaseForFDroidDebugKotlin
+e: C:\Projects\Wallet\app\src\main\java\org\walleth\ui\WalletPrefsFragment.kt: (48, 21): Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type FragmentActivity?
+e: C:\Projects\Wallet\app\src\main\java\org\walleth\ui\WalletPrefsFragment.kt: (53, 28): Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type Context?
+e: C:\Projects\Wallet\app\src\main\java\org\walleth\ui\WalletPrefsFragment.kt: (53, 49): Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type Context?
+e: C:\Projects\Wallet\app\src\main\java\org\walleth\ui\WalletPrefsFragment.kt: (55, 28): Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type Context?
+> Task :app:compileWithGethNoFirebaseForFDroidDebugKotlin FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileWithGethNoFirebaseForFDroidDebugKotlin'.
+> Compilation error. See log for more details
+
+* Try:
+Run with --stacktrace option to get the stack trace. Run with --info or --debug option to get more log output. Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 1m 59s
+16 actionable tasks: 16 executed

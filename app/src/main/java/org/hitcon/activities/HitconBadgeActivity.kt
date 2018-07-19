@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.support.v4.app.ActivityCompat
@@ -19,6 +20,7 @@ import android.widget.Toast
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
+import kotlinx.android.synthetic.main.activity_badge.*
 import org.hitcon.BadgeProvider
 import org.hitcon.data.qrcode.HitconQrCode
 import org.hitcon.data.qrcode.InitializeContent
@@ -86,21 +88,17 @@ class HitconBadgeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_badge)
         supportActionBar?.setSubtitle(R.string.badge_title)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
-
-        //check permission
-
     }
 
     override fun onResume() {
         super.onResume()
         registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
 //        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
 //            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCALE)
-
+        }
 
 
 
@@ -110,20 +108,19 @@ class HitconBadgeActivity : AppCompatActivity() {
         // else if device is not null, then check device status and device service list is null
         //   if service list is null, scan it
         //   else, service is ready to receive command
-        if (badgeProvider.entity != null) {
-            if (badgeProvider.device == null)
-                badgeProvider.startScanDevice()
-            else if (badgeProvider.services.size == 0 || !badgeProvider.connected)
-                badgeProvider.startConnectGatt()
-        }
+//        if (badgeProvider.entity != null) {
+//            if (badgeProvider.device == null)
+//                badgeProvider.startScanDevice()
+//            else if (badgeProvider.services.size == 0 || !badgeProvider.connected)
+//                badgeProvider.startConnectGatt()
+//        }
 
 
         if (intent.hasHitconQrCode()) {
             val init = InitializeContent(intent.getHitconQrCode().data)
+            hitcon_badge_status.text = "Connecting..."
             badgeProvider.initializeBadge(init, object: BadgeProvider.BadgeCallback {
                 override fun onServiceDiscover() {
-
-
                     this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
                     this@HitconBadgeActivity.finish()
                 }

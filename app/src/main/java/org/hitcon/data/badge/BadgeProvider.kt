@@ -337,7 +337,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     fun initializeBadge(init: InitializeContent, leScanCallback: BadgeCallback? = null) {
         //this.initializeContent = initializeContent
         entity = BadgeEntity(init.service, init.address, key=init.key, services = getServiceEntityList(init.service))
-
+        stopScanDevice(false)
         startScanDevice(leScanCallback)
     }
 
