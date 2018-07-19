@@ -9,8 +9,6 @@ import android.os.Message
 import android.util.Log
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
-import org.ethereum.geth.BigInt
-import org.ethereum.geth.Transaction
 import org.hitcon.data.badge.BadgeEntity
 import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
@@ -18,7 +16,6 @@ import org.hitcon.data.badge.upsertBadge
 import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.helper.toHex
 import org.walleth.data.AppDatabase
-import org.walleth.kethereum.geth.toBigInteger
 import org.walleth.khex.hexToByteArray
 import java.math.BigDecimal
 import java.nio.ByteBuffer
@@ -86,13 +83,13 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     init {
         async(CommonPool) {
             entity = appDatabase.badges.getLastBadge()
-            if(entity != null)
-                startScanDevice()
         }
     }
 
     override fun handleMessage(msg: Message?) {
+        Log.d("Badge", "Receive message: ${msg?.what}")
         when (msg?.what) {
+
             MessageStopScanDevices -> {
                 stopScanDevice()
             }
@@ -131,13 +128,18 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
     private class BadgeScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothAdapter.LeScanCallback {
         override fun onLeScan(device: BluetoothDevice?, rssi: Int, scanRecord: ByteArray?) {
+            Log.d("Badge", "Found device: ${device!!.address}")
             var uuids = parseUUIDList(scanRecord!!)
             if (uuids.size> 0 && uuids.first().toString() == badgeProvider.entity?.identify) {
+            //if (uuids.size> 0 ) {
                 badgeProvider.device = device
                 badgeCallback?.onDeviceFound(device!!)
                 badgeProvider.sendEmptyMessage(MessageStopScanDevices)
                 badgeProvider.sendEmptyMessage(MessageStartScanGattService)
             }
+            else
+                Log.d("Badge", "...Not badge")
+
         }
 
         private fun parseUUIDList(bytes: ByteArray): ArrayList<UUID> {
@@ -217,10 +219,10 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                 badgeProvider.services.clear()
                 for(service in gatt?.services!!) {
                     if (service.uuid.toString() == badgeProvider.entity?.identify) {
-                        service.characteristics.forEach {
-                            var name = badgeProvider.entity?.getUuidName(it.uuid)
+                        for(ch in service.characteristics) {
+                            var name = badgeProvider.entity?.getUuidName(ch.uuid)
                             if (name != null)
-                                badgeProvider.services[name] = it
+                                badgeProvider.services[name] = ch
                         }
 
                         badgeProvider.saveEntity()

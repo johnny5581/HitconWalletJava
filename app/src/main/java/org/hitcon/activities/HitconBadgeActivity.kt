@@ -2,6 +2,7 @@ package org.hitcon.activities
 
 import android.Manifest
 import android.app.Activity
+import android.app.ProgressDialog
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -88,11 +89,7 @@ class HitconBadgeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_badge)
         supportActionBar?.setSubtitle(R.string.badge_title)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-    }
 
-    override fun onResume() {
-        super.onResume()
-        registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
@@ -119,8 +116,11 @@ class HitconBadgeActivity : AppCompatActivity() {
         if (intent.hasHitconQrCode()) {
             val init = InitializeContent(intent.getHitconQrCode().data)
             hitcon_badge_status.text = "Connecting..."
+            val dialog = ProgressDialog.show(this, "Hitcon Badge", "Connecting...")
             badgeProvider.initializeBadge(init, object: BadgeProvider.BadgeCallback {
                 override fun onServiceDiscover() {
+                    hitcon_badge_status.text = "Connected"
+                    dialog.hide()
                     this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
                     this@HitconBadgeActivity.finish()
                 }
@@ -130,15 +130,18 @@ class HitconBadgeActivity : AppCompatActivity() {
                 }
 
                 override fun onDeviceFound(device: BluetoothDevice) {
-
+                    dialog.setMessage("Device found, Connecting Gatt...")
                 }
             })
         }else if(intent.hasTx()) {
             //begin sign
             badgeProvider.startTransaction(intent.getTx())
         }
+    }
 
-
+    override fun onResume() {
+        super.onResume()
+        registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
     }
 
     override fun onPause() {
