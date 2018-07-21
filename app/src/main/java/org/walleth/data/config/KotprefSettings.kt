@@ -14,7 +14,7 @@ import java.security.SecureRandom
 
 object KotprefSettings : KotprefModel(), Settings {
 
-    override var currentFiat by stringPref(default = "USD")
+    override var currentFiat by stringPref(default = "TWD")
     override var startupWarningDone by booleanPref(default = false)
     override var showOnlyStaredTokens by booleanPref(default = false)
 
@@ -25,7 +25,7 @@ object KotprefSettings : KotprefModel(), Settings {
     override var accountAddress by nullableStringPref(null)
 
     override var addressInitVersion by intPref(0)
-    override var tokensInitVersion by intPref(0)
+    override var tokensInitVersion by intPref(1)
 
     override var currentGoVerbosity by intPref(3)
 

@@ -117,14 +117,13 @@ class CreateAccountActivity : AppCompatActivity() {
     }
 
     private fun onBadgeClick() {
-
-        if (intent.hasHitconQrCode()) {
-            startActivityForResult(Intent(this, HitconBadgeActivity::class.java).apply {
-                putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
-            }, REQUEST_CODE_BADGE)
-        } else {
+//        if (intent.hasHitconQrCode()) {
+//            startActivityForResult(Intent(this, HitconBadgeActivity::class.java).apply {
+//                putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
+//            }, REQUEST_CODE_BADGE)
+//        } else {
             startScanActivityForResult(this)
-        }
+//        }
     }
 
 
@@ -144,9 +143,13 @@ class CreateAccountActivity : AppCompatActivity() {
             getStringExtra("SCAN_RESULT")?.let { stringExtra ->
                 if (stringExtra.isHitconQrCodeUri()) {
                     var code = stringExtra.toHitconQrCode()
-                    if (code.valid)
+                    if (code.valid) {
                         intent.putExtra(KeyHitconQrCode, code)
-                    onBadgeClick()
+                        startActivityForResult(Intent(this@CreateAccountActivity, HitconBadgeActivity::class.java).apply {
+                            putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
+                        }, REQUEST_CODE_BADGE)
+                    }
+
                 } else {
                     val address = if (stringExtra.isEthereumURLString()) {
                         parseERC681(stringExtra).address

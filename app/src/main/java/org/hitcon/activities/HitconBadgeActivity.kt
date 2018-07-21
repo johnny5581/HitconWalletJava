@@ -2,26 +2,23 @@ package org.hitcon.activities
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.ProgressDialog
 import android.bluetooth.BluetoothDevice
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
-import kotlinx.android.synthetic.main.activity_badge.*
 import org.hitcon.BadgeProvider
 import org.hitcon.data.qrcode.HitconQrCode
 import org.hitcon.data.qrcode.InitializeContent
@@ -41,7 +38,9 @@ fun Intent.hasTx() = this.hasExtra("TX")
 fun Intent.getTx() = this.getParcelableExtra<TransactionParcel>("TX").transaction
 class HitconBadgeActivity : AppCompatActivity() {
     companion object {
-        const val ReceiveTxn = 0
+        const val TAG = "HitconBadge"
+        const val MessageReceiveTxn = 0
+        const val MessageRestartProcess = 1
         const val Txn = "TXN"
         const val REQUEST_LOCALE = 1000
     }
@@ -50,12 +49,69 @@ class HitconBadgeActivity : AppCompatActivity() {
 
     private val handler = Handler(this)
     private val receiverTxn = TxnReceiver(handler)
-    private var inited = false
+    private val mainProcess = Runnable {
+        if (intent.hasHitconQrCode()) {
+            handleInitialize(intent.getHitconQrCode().data)
+        } else if (!badgeProvider.connected) {
+            //check connect, prepared connection
+            if (badgeProvider.device == null) {
+                if (badgeProvider.entity == null) {
+                    AlertDialog.Builder(this)
+                            .setMessage("Need init first")
+                            .setPositiveButton("OK") { _, _ ->
+                                this@HitconBadgeActivity.finish()
+                            }
+                            .create().show()
+                } else {
+                    val dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Connecting...")
+                    badgeProvider.startScanDevice(object : BadgeProvider.BadgeCallback {
+                        override fun onServiceDiscover() {
+                            dialog.dismiss()
+                            handler.sendEmptyMessage(MessageRestartProcess)
+                        }
+
+                        override fun onTimeout() {
+                            dialog.dismiss()
+                            AlertDialog.Builder(this@HitconBadgeActivity)
+                                    .setMessage("Connection Timeout")
+                                    .setPositiveButton("OK") { _, _ ->
+                                        this@HitconBadgeActivity.finish()
+                                    }
+                                    .create().show()
+                        }
+
+                        override fun onDeviceFound(device: BluetoothDevice) {
+                            dialog.setMessage("Device found, Connecting Gatt...")
+                            badgeProvider.startConnectGatt(device, this)
+                        }
+                    })
+                }
+            } else { //gatt connect is fail
+                val dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Device found, Connecting Gatt...")
+                badgeProvider.startConnectGatt(badgeProvider.device!!, object : BadgeProvider.BadgeCallback {
+                    override fun onServiceDiscover() {
+                        dialog.dismiss()
+                        handler.sendEmptyMessage(MessageRestartProcess)
+                    }
+
+                    override fun onTimeout() {
+                    }
+
+                    override fun onDeviceFound(device: BluetoothDevice) {
+                    }
+                })
+            }
+        } else if (intent.hasTx()) {
+            //intent has text, need sign
+            badgeProvider.startTransaction(intent.getTx())
+        }
+    }
+
 
     private class TxnReceiver(val handler: android.os.Handler) : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             handler.sendMessage(Message().apply {
-                what = ReceiveTxn
+                what = MessageReceiveTxn
                 data.putString(Txn, intent?.getTxn())
             })
         }
@@ -65,7 +121,7 @@ class HitconBadgeActivity : AppCompatActivity() {
     private class BadgeStateReceiver(val handler: android.os.Handler) : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             handler.sendMessage(Message().apply {
-                what = ReceiveTxn
+                what = MessageReceiveTxn
                 data.putString(Txn, intent?.getTxn())
             })
         }
@@ -74,9 +130,10 @@ class HitconBadgeActivity : AppCompatActivity() {
     private class Handler(val activity: HitconBadgeActivity) : android.os.Handler() {
         override fun handleMessage(msg: Message?) {
             when (msg?.what) {
-                ReceiveTxn -> {
+                MessageReceiveTxn -> {
                     /* do some?  */
                 }
+                MessageRestartProcess -> activity.handler.post(activity.mainProcess)
             }
 
 
@@ -89,59 +146,51 @@ class HitconBadgeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_badge)
         supportActionBar?.setSubtitle(R.string.badge_title)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
-//        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-//            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCALE)
-        }
-
-
-
-
-        //if entity is not null, check device
-        // if device is null then scan it
-        // else if device is not null, then check device status and device service list is null
-        //   if service list is null, scan it
-        //   else, service is ready to receive command
-//        if (badgeProvider.entity != null) {
-//            if (badgeProvider.device == null)
-//                badgeProvider.startScanDevice()
-//            else if (badgeProvider.services.size == 0 || !badgeProvider.connected)
-//                badgeProvider.startConnectGatt()
-//        }
-
-
-        if (intent.hasHitconQrCode()) {
-            val init = InitializeContent(intent.getHitconQrCode().data)
-            hitcon_badge_status.text = "Connecting..."
-            val dialog = ProgressDialog.show(this, "Hitcon Badge", "Connecting...")
-            badgeProvider.initializeBadge(init, object: BadgeProvider.BadgeCallback {
-                override fun onServiceDiscover() {
-                    hitcon_badge_status.text = "Connected"
-                    dialog.hide()
-                    this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
-                    this@HitconBadgeActivity.finish()
-                }
-
-                override fun onTimeout() {
-                    this@HitconBadgeActivity.finish()
-                }
-
-                override fun onDeviceFound(device: BluetoothDevice) {
-                    dialog.setMessage("Device found, Connecting Gatt...")
-                }
-            })
-        }else if(intent.hasTx()) {
-            //begin sign
-            badgeProvider.startTransaction(intent.getTx())
-        }
     }
 
     override fun onResume() {
         super.onResume()
         registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
+
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCALE)
+        else {
+            handler.post(mainProcess)
+        }
+    }
+
+    private fun handleInitialize(data: Map<String, String>) {
+        val init = InitializeContent(data)
+        Log.d(TAG, "service uuid: ${init.service}")
+        val dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Connecting...")
+        badgeProvider.initializeBadge(init, object : BadgeProvider.BadgeCallback {
+            override fun onServiceDiscover() {
+                dialog.dismiss()
+                this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
+                this@HitconBadgeActivity.finish()
+            }
+
+            override fun onTimeout() {
+                dialog.dismiss()
+                AlertDialog.Builder(this@HitconBadgeActivity)
+                        .setMessage("Connection Timeout")
+                        .setPositiveButton("OK") { _, _ ->
+                            this@HitconBadgeActivity.finish()
+                        }
+                        .create().show()
+            }
+
+            override fun onDeviceFound(device: BluetoothDevice) {
+                dialog.setMessage("Device found, Connecting Gatt...")
+                badgeProvider.startConnectGatt(device, this)
+            }
+        })
+    }
+
+    override fun onDestroy() {
+        Log.w(TAG, "destroy badge activity")
+        super.onDestroy()
     }
 
     override fun onPause() {
@@ -182,14 +231,16 @@ class HitconBadgeActivity : AppCompatActivity() {
         }
         else -> super.onOptionsItemSelected(item)
     }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        if(requestCode == REQUEST_LOCALE) {
-            if(grantResults.any{ it != PackageManager.PERMISSION_GRANTED }) {
+        if (requestCode == REQUEST_LOCALE) {
+            if (grantResults.any { it != PackageManager.PERMISSION_GRANTED }) {
                 Toast.makeText(this, "Need locale permission.", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }
     }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     }
 }

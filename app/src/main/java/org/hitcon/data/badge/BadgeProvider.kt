@@ -1,22 +1,30 @@
 package org.hitcon
 
 import android.bluetooth.*
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
 import android.util.Log
 import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.hitcon.data.badge.BadgeEntity
 import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
 import org.hitcon.data.badge.upsertBadge
 import org.hitcon.data.qrcode.InitializeContent
-import org.hitcon.helper.toHex
+import org.ligi.kaxt.applyIf
+import org.ligi.kaxt.letIf
 import org.walleth.data.AppDatabase
 import org.walleth.khex.hexToByteArray
+import org.walleth.khex.toHexString
+import java.lang.reflect.InvocationTargetException
 import java.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -47,6 +55,8 @@ enum class HitconBadgeServices {
  */
 class BadgeProvider(private val context: Context, private val appDatabase: AppDatabase) : Handler() {
     companion object {
+        const val TAG = "HitconBadge"
+
         const val MessageReceiveTxn = 1
         const val ActionReceiveTxn = "Action_ReceiveTxn"
         const val MessageGattConnectionChanged = 2
@@ -68,21 +78,25 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     var scanning: Boolean = false
     val services: LinkedHashMap<HitconBadgeServices, BluetoothGattCharacteristic> = LinkedHashMap()
     var connected: Boolean = false
-    //var initializeContent: InitializeContent? = null
 
 
     private var scanDeviceCallback: BadgeScanCallback? = null
+    private var scanDeviceCallback2: BadgeScanCallbackNew? = null
     private var gattScanCallback: GattScanCallback? = null
     private val delayStopScanRunnable = Runnable { stopScanDevice(true) }
 
     private var gatt: BluetoothGatt? = null
     private var adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
-    private var mtu = 512
+    private var leScanner: BluetoothLeScanner? = if (Build.VERSION.SDK_INT > 21) adapter.bluetoothLeScanner else null
+    private var mtu = 167
+    private val delay = 15 * 1000L
     private var iv: ByteArray = ByteArray(16)
 
     init {
-        async(CommonPool) {
-            entity = appDatabase.badges.getLastBadge()
+        async(UI) {
+            async(CommonPool) {
+                entity = appDatabase.badges.getLastBadge()
+            }.await()
         }
     }
 
@@ -103,9 +117,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             }
             MessageGattConnectionChanged -> {
             }
-            MessageStartScanGattService-> {
-                device?.run {
-                    startConnectGatt()
+            MessageStartScanGattService -> {
+                device?.let {
+                    startConnectGatt(it)
                 }
             }
         }
@@ -119,27 +133,26 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         fun onServiceDiscover()
     }
 
-    private fun getServiceEntityList(service: String) : List<BadgeServiceEntity> {
+    private fun getServiceEntityList(init: InitializeContent): List<BadgeServiceEntity> {
         val list = ArrayList<BadgeServiceEntity>()
-        for(name in serviceNames)
-            list.add(BadgeServiceEntity(service, name.name))
+        for (name in serviceNames)
+            list.add(BadgeServiceEntity(init.service, name.name, init.getUUID(name)))
         return list
     }
 
+    /**
+     * Android Version < 21 Adapter Scanner
+     */
     private class BadgeScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothAdapter.LeScanCallback {
         override fun onLeScan(device: BluetoothDevice?, rssi: Int, scanRecord: ByteArray?) {
-            Log.d("Badge", "Found device: ${device!!.address}")
-            var uuids = parseUUIDList(scanRecord!!)
-            if (uuids.size> 0 && uuids.first().toString() == badgeProvider.entity?.identify) {
-            //if (uuids.size> 0 ) {
+            Log.d(TAG, "onLeScan: ${device?.toString()}")
+            val uuids = parseUUIDList(scanRecord!!)
+            if (uuids.size > 0 && uuids.any { u -> u.toString() == badgeProvider.entity?.identify }) {
                 badgeProvider.device = device
-                badgeCallback?.onDeviceFound(device!!)
+                device?.let { badgeCallback?.onDeviceFound(it) }
                 badgeProvider.sendEmptyMessage(MessageStopScanDevices)
-                badgeProvider.sendEmptyMessage(MessageStartScanGattService)
+//                badgeProvider.sendEmptyMessage(MessageStartScanGattService)
             }
-            else
-                Log.d("Badge", "...Not badge")
-
         }
 
         private fun parseUUIDList(bytes: ByteArray): ArrayList<UUID> {
@@ -180,65 +193,95 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
     }
 
+    /***
+     * Android Version > 21 LeScanner Callback
+     */
+    private class BadgeScanCallbackNew(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: ScanResult?) {
+            super.onScanResult(callbackType, result)
+            Log.d(TAG, "onBadgeScanResult: ${result?.scanRecord?.toString()}")
+            val uuids = result?.scanRecord?.serviceUuids
+            val device = result?.device
+            uuids?.let {
+                if (it.size > 0 && it.any { u -> u.toString() == badgeProvider.entity?.identify }) {
+                    badgeProvider.device = device
+                    device?.let { badgeCallback?.onDeviceFound(it) }
+                    badgeProvider.sendEmptyMessage(MessageStopScanDevices)
+//                    badgeProvider.sendEmptyMessage(MessageStartScanGattService)
+                }
+            }
 
+        }
+    }
+
+    /**
+     * Gatt callback
+     */
     private class GattScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothGattCallback() {
 
-
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+            Log.i(TAG, "onConnectionStateChange: $status -> $newState")
             badgeProvider.connected = newState == BluetoothGatt.STATE_CONNECTED
             badgeProvider.sendEmptyMessage(MessageGattConnectionChanged)
             when (newState) {
                 BluetoothGatt.STATE_CONNECTED -> {
-                    badgeProvider.gatt = gatt
-                    gatt?.requestMtu(badgeProvider.mtu)
+                    Log.d(TAG, "start discoverService")
+                    gatt?.discoverServices()
                 }
             }
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+            Log.i(TAG, "onMtuChanged, success: ${status == BluetoothGatt.GATT_SUCCESS}")
             when (status) {
                 BluetoothGatt.GATT_SUCCESS -> {
+                    Log.d(TAG, "mtu change to $mtu")
                     badgeProvider.mtu = mtu
-                    gatt?.discoverServices()
                 }
                 BluetoothGatt.GATT_FAILURE -> {
+                    Log.e(TAG, "mtu fail: $mtu")
                     val tmp = mtu / 2
                     if (tmp < 128)
                         badgeProvider.sendMessage(Message().apply {
                             what = MessageMtuFailure
                             data = Bundle().apply { putInt(KeyMtu, mtu) }
                         })
-                    else
+                    else {
+                        Log.e(TAG, "reset mtu to $tmp")
                         gatt?.requestMtu(tmp)
-                }
-            }
-        }
-
-        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                badgeProvider.services.clear()
-                for(service in gatt?.services!!) {
-                    if (service.uuid.toString() == badgeProvider.entity?.identify) {
-                        for(ch in service.characteristics) {
-                            var name = badgeProvider.entity?.getUuidName(ch.uuid)
-                            if (name != null)
-                                badgeProvider.services[name] = ch
-                        }
-
-                        badgeProvider.saveEntity()
-                        badgeCallback?.onServiceDiscover()
                     }
                 }
             }
         }
 
-        override fun onCharacteristicRead(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
-            if (characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid) {
-                badgeProvider.sendMessage(Message().apply {
-                    what = MessageReceiveTxn
-                    data = Bundle().apply { putByteArray(KeyTxn, characteristic?.value) }
-                })
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            Log.i(TAG, "onServicesDiscovered, success: ${status == BluetoothGatt.GATT_SUCCESS}")
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                badgeProvider.services.clear()
+                Log.d(TAG, "pair service: ${badgeProvider.entity?.identify}")
+                for (service in gatt!!.services) {
+                    Log.d(TAG, "matching service: ${service.uuid}")
+                    if (service.uuid.toString() == badgeProvider.entity?.identify) {
+                        for (ch in service.characteristics) {
+                            var name = badgeProvider.entity?.getUuidName(ch.uuid)
+                            if (name != null)
+                                badgeProvider.services[name] = ch
+                        }
+                    }
+                }
+                badgeCallback?.onServiceDiscover()
+                Log.d(TAG, "start change mtu: ${badgeProvider.mtu}")
+                gatt?.requestMtu(badgeProvider.mtu)
             }
+        }
+
+        override fun onCharacteristicRead(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
+//            if (characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid) {
+//                badgeProvider.sendMessage(Message().apply {
+//                    what = MessageReceiveTxn
+//                    data = Bundle().apply { putByteArray(KeyTxn, characteristic?.value) }
+//                })
+//            }
 
         }
 
@@ -258,94 +301,128 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     /**
      * Stat scan device, use initialize content
      */
-    fun startScanDevice(onDeviceFound: BadgeCallback? = null) {
+    fun startScanDevice(badgeCallback: BadgeCallback? = null) {
+        Log.i(TAG, "... startScanDevice .... ")
         if (scanning) stopScanDevice()
-        scanDeviceCallback = BadgeScanCallback(this, onDeviceFound)
-        adapter.startLeScan(scanDeviceCallback)
-        postDelayed(delayStopScanRunnable, 10 * 1000)
-    }
-
-    fun saveEntity(){
-//        val service = initializeContent!!.service
-//        val address = initializeContent!!.address
-//        val list = ArrayList<BadgeServiceEntity>()
-//        for(kv in services) {
-//            list.add(BadgeServiceEntity(service, kv.key.name, kv.value.uuid))
-//        }
-//        entity = BadgeEntity(service, address, services = list)
-        async(CommonPool) {
-            appDatabase.badges.upsertBadge(entity!!)
+        scanning = true
+        if (leScanner == null) {
+            scanDeviceCallback = BadgeScanCallback(this, badgeCallback)
+            adapter.startLeScan(scanDeviceCallback)
+        } else {
+            scanDeviceCallback2 = BadgeScanCallbackNew(this, badgeCallback)
+            leScanner!!.startScan(scanDeviceCallback2)
         }
+        postDelayed(delayStopScanRunnable, delay)
     }
 
+    fun startConnectGatt(device: BluetoothDevice, leScanCallback: BadgeCallback? = null) {
+        Log.i(TAG, "... startConnectGatt .... ")
+        if (connected) {
+            Log.d(TAG, "Gatt is connected, disconnect first")
+            gatt?.disconnect()
+        }
+        if (gatt == null) {
+            Log.d(TAG, "no gatt instance, connect create")
+            gattScanCallback = GattScanCallback(this, leScanCallback)
+            gatt = device?.connectGatt(context, false, gattScanCallback)
+        } else {
+            Log.d(TAG, "gatt instance exist, reconnect")
+            gatt?.let {
+                it.disconnect()
+                it.connect()
+            }
+        }
+        //gatt?.let { refreshGatt(it) }
+    }
 
     /**
      * Stop scan, if timeout then call callback
      */
     private fun stopScanDevice(timeout: Boolean = false) {
-        if (scanning && scanDeviceCallback != null) {
+        if (scanning) {
+            Log.i(TAG, "stopScanDevice, timeout flag: $timeout")
             if (timeout) {
-                scanDeviceCallback!!.badgeCallback?.onTimeout()
+                scanDeviceCallback?.badgeCallback?.onTimeout()
+                scanDeviceCallback2?.badgeCallback?.onTimeout()
             } else {
                 removeCallbacks(delayStopScanRunnable)
             }
-            adapter.stopLeScan(scanDeviceCallback)
+
+            scanDeviceCallback?.let { adapter.stopLeScan(it) }
+            scanDeviceCallback2?.let { leScanner?.stopScan(it) }
             scanning = false
-            scanDeviceCallback = null
         }
     }
+
+    fun saveEntity() {
+        entity?.let {
+            async(UI) {
+                async(CommonPool) {
+                    appDatabase.badges.upsertBadge(it)
+                }.await()
+            }
+        }
+    }
+
+    fun refreshGatt(gatt: BluetoothGatt) {
+        if (gatt != null) {
+            //add_info("Connected!\n");
+            try {
+                val method = gatt.javaClass.getMethod("refresh")
+                method?.invoke(gatt)
+            } catch (e: NoSuchMethodException) {
+                e.printStackTrace()
+            } catch (e: IllegalAccessException) {
+                e.printStackTrace()
+            } catch (e: InvocationTargetException) {
+                e.printStackTrace()
+            }
+
+        }
+    }
+
 
     fun startTransaction(transaction: org.kethereum.model.Transaction) {
         val hvalue = BigDecimal(transaction.value).toHex()
         val hgaslimit = transaction.gasLimit.toBigDecimal().toHex()
         val hgas = BigDecimal(transaction.gasPrice).toHex()
         val hnoice = transaction.nonce?.toBigDecimal()?.toHex()
-        val hdata = transaction.txHash
-        val transArray = "01"+String.format("%02X", transaction.to.toString().length/2)+transaction.to.toString() +
-                "02"+String.format("%02X", hvalue.length/2)+hvalue+
-                "03"+String.format("%02X", hgas.length/2)+hgas+
-                "04"+String.format("%02X", hgaslimit.length/2)+hgaslimit+
-                "05"+String.format("%02X", hnoice!!.length/2)+hnoice+
-                "06"+String.format("%02X", hdata!!.length/2)+hdata
+        val hdata = transaction.input.toHexString()
+        val transArray = "01" + String.format("%02X", transaction.to.toString().length / 2) + transaction.to.toString() +
+                "02" + String.format("%02X", hvalue.length / 2) + hvalue +
+                "03" + String.format("%02X", hgas.length / 2) + hgas +
+                "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
+                "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
+                "06" + String.format("%02X", hdata!!.length / 2) + hdata
 
         SecureRandom(iv)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
-        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
-        val cha = services[HitconBadgeServices.Transaction]
-        cha?.value = enc
-        gatt?.setCharacteristicNotification(cha!!, true)
-        enableNotifications(services[HitconBadgeServices.Txn]!!)
+//        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
+//        gatt?.getService(UUID.fromString(entity?.identify))?.getCharacteristic(entity?.services?.first{ t->t.name == HitconBadgeServices.Transaction})
+//        val cha = services[HitconBadgeServices.Transaction]
+//        cha?.value = enc
+//        gatt?.setCharacteristicNotification(cha!!, true)
+//        enableNotifications(services[HitconBadgeServices.Txn]!!)
     }
 
 
-
-
-    private fun BigDecimal.toHex() : String {
+    private fun BigDecimal.toHex(): String {
         var result = String.format("%X", this.toBigInteger())
-        if(result.length%2 == 1)
+        if (result.length % 2 == 1)
             result = "0$result"
         return result
     }
 
 
-
-    fun startConnectGatt(leScanCallback: BadgeCallback? = null) {
-        if(connected) return
-        gattScanCallback = GattScanCallback(this, leScanCallback)
-        device?.connectGatt(context, false, gattScanCallback)
-    }
-
     fun initializeBadge(init: InitializeContent, leScanCallback: BadgeCallback? = null) {
-        //this.initializeContent = initializeContent
-        entity = BadgeEntity(init.service, init.address, key=init.key, services = getServiceEntityList(init.service))
-        stopScanDevice(false)
+        entity = BadgeEntity(init.service, null, init.address, key = init.key, services = getServiceEntityList(init))
+        saveEntity()
         startScanDevice(leScanCallback)
     }
 
 
-
-    private fun getDecryptText(cyber: ByteArray) : String {
+    private fun getDecryptText(cyber: ByteArray): String {
         return decrypt(iv, entity!!.key!!.toByteArray(), cyber).toString(Charset.defaultCharset())
     }
 

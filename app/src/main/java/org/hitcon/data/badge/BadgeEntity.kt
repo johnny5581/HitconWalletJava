@@ -15,6 +15,8 @@ data class BadgeEntity(
         @PrimaryKey
         var identify: String = "",
 
+        var mac: String? = null,
+
         var address: String? = null,
 
         var name: String? = null,
