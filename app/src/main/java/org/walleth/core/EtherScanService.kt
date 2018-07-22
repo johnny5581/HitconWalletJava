@@ -159,9 +159,9 @@ class EtherScanService : LifecycleService() {
                     newTransactions.list.forEach {
 
                         val oldEntry = appDatabase.transactions.getByHash(it.hash)
-                        if (oldEntry == null || oldEntry.transactionState.isPending) {
+                        //if (oldEntry == null || oldEntry.transactionState.isPending) {
                             appDatabase.transactions.upsert(it)
-                        }
+                        //}
                     }
 
                 }

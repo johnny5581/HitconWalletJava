@@ -19,13 +19,20 @@ import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
 import org.hitcon.data.badge.upsertBadge
 import org.hitcon.data.qrcode.InitializeContent
+import org.hitcon.helper.toHex
+import org.kethereum.functions.getTokenTransferTo
+import org.kethereum.functions.getTokenTransferValue
+import org.kethereum.model.Address
 import org.ligi.kaxt.applyIf
 import org.ligi.kaxt.letIf
 import org.walleth.data.AppDatabase
+import org.walleth.functions.toHexString
+import org.walleth.khex.clean0xPrefix
 import org.walleth.khex.hexToByteArray
 import org.walleth.khex.toHexString
 import java.lang.reflect.InvocationTargetException
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
@@ -38,6 +45,7 @@ import javax.crypto.spec.SecretKeySpec
 
 fun Intent.hasTxn() = this.hasExtra(KeyTxn)
 fun Intent.getTxn() = this.getStringExtra(KeyTxn)
+
 const val KeyTxn = "Txn"
 const val KeyMtu = "Mtu"
 
@@ -56,7 +64,7 @@ enum class HitconBadgeServices {
 class BadgeProvider(private val context: Context, private val appDatabase: AppDatabase) : Handler() {
     companion object {
         const val TAG = "HitconBadge"
-
+        const val InitializeBadgeProvider = 0
         const val MessageReceiveTxn = 1
         const val ActionReceiveTxn = "Action_ReceiveTxn"
         const val MessageGattConnectionChanged = 2
@@ -88,7 +96,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private var gatt: BluetoothGatt? = null
     private var adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private var leScanner: BluetoothLeScanner? = if (Build.VERSION.SDK_INT > 21) adapter.bluetoothLeScanner else null
-    private var mtu = 167
+    private var mtu = 512
     private val delay = 15 * 1000L
     private var iv: ByteArray = ByteArray(16)
 
@@ -327,11 +335,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             gatt = device?.connectGatt(context, false, gattScanCallback)
         } else {
             Log.d(TAG, "gatt instance exist, reconnect")
-            gatt?.let {
-                it.disconnect()
-                it.connect()
-            }
         }
+        gatt?.disconnect()
+        gatt?.connect()
         //gatt?.let { refreshGatt(it) }
     }
 
@@ -382,28 +388,35 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     }
 
 
-    fun startTransaction(transaction: org.kethereum.model.Transaction) {
-        val hvalue = BigDecimal(transaction.value).toHex()
-        val hgaslimit = transaction.gasLimit.toBigDecimal().toHex()
-        val hgas = BigDecimal(transaction.gasPrice).toHex()
-        val hnoice = transaction.nonce?.toBigDecimal()?.toHex()
-        val hdata = transaction.input.toHexString()
-        val transArray = "01" + String.format("%02X", transaction.to.toString().length / 2) + transaction.to.toString() +
-                "02" + String.format("%02X", hvalue.length / 2) + hvalue +
-                "03" + String.format("%02X", hgas.length / 2) + hgas +
-                "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
-                "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
-                "06" + String.format("%02X", hdata!!.length / 2) + hdata
+    fun startTransaction(transaction: org.kethereum.model.Transaction): Boolean {
+        val haddress = transaction.getTokenTransferTo().toString().clean0xPrefix()
+        val hvalue = transaction.getTokenTransferValue().toHexString().clean0xPrefix()
+        val hgaslimit = transaction.gasLimit.toHexString().clean0xPrefix()
+        val hgas = transaction.gasPrice.toHexString().clean0xPrefix()
+        val hnoice = transaction.nonce!!.toHexString().clean0xPrefix().padStart(2, '0')
+        val hdata = transaction.input.toHexString().clean0xPrefix()
+        var transArray =
+                "01" + String.format("%02X", haddress.length / 2) + haddress +
+                        "02" + String.format("%02X", hvalue.length / 2) + hvalue +
+                        "03" + String.format("%02X", hgas.length / 2) + hgas +
+                        "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
+                        "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
+                        "06" + String.format("%02X", hdata!!.length / 2) + hdata
+
+
 
         SecureRandom(iv)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
-//        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
-//        gatt?.getService(UUID.fromString(entity?.identify))?.getCharacteristic(entity?.services?.first{ t->t.name == HitconBadgeServices.Transaction})
-//        val cha = services[HitconBadgeServices.Transaction]
-//        cha?.value = enc
-//        gatt?.setCharacteristicNotification(cha!!, true)
-//        enableNotifications(services[HitconBadgeServices.Txn]!!)
+        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
+        val cha = services[HitconBadgeServices.Transaction]
+        cha?.run {
+            this.value = enc
+            gatt?.let {
+                it.setCharacteristicNotification(this, true)
+                enableNotifications(services[HitconBadgeServices.Txn]!!)
+            }
+        }
     }
 
 

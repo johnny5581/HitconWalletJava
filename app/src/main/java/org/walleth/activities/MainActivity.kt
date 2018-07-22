@@ -286,11 +286,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     }
 
     private val etherObserver = Observer<Balance> {
-        if (it != null) {
-            send_container.setVisibility(it.balance > ZERO, INVISIBLE)
-        } else {
-            send_container.visibility = INVISIBLE
-        }
+//        if (it != null) {
+//            send_container.setVisibility(it.balance > ZERO, INVISIBLE)
+//        } else {
+//            send_container.visibility = INVISIBLE
+//        }
     }
 
     private fun setCurrentBalanceObservers() {

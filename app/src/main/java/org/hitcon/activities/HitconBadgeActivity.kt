@@ -103,6 +103,7 @@ class HitconBadgeActivity : AppCompatActivity() {
             }
         } else if (intent.hasTx()) {
             //intent has text, need sign
+            val dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Waiting for transaction...")
             badgeProvider.startTransaction(intent.getTx())
         }
     }
@@ -131,7 +132,8 @@ class HitconBadgeActivity : AppCompatActivity() {
         override fun handleMessage(msg: Message?) {
             when (msg?.what) {
                 MessageReceiveTxn -> {
-                    /* do some?  */
+                    val success = msg.data.getBoolean("TxSuc")
+                    if(success)
                 }
                 MessageRestartProcess -> activity.handler.post(activity.mainProcess)
             }
@@ -140,6 +142,10 @@ class HitconBadgeActivity : AppCompatActivity() {
         }
     }
 
+    override fun finish() {
+        super.finish()
+        releaseInstance()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,7 +173,7 @@ class HitconBadgeActivity : AppCompatActivity() {
         badgeProvider.initializeBadge(init, object : BadgeProvider.BadgeCallback {
             override fun onServiceDiscover() {
                 dialog.dismiss()
-                this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KEY_SCAN_RESULT, init.address) })
+                this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KeyHitconBadgeAddress, init.address) })
                 this@HitconBadgeActivity.finish()
             }
 

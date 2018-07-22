@@ -17,6 +17,7 @@ import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
 import okhttp3.OkHttpClient
 import org.hitcon.BadgeProvider
+import org.hitcon.BadgeProvider.Companion.InitializeBadgeProvider
 import org.kethereum.model.Address
 import org.ligi.tracedroid.TraceDroid
 import org.walleth.contracts.FourByteDirectory
@@ -110,6 +111,7 @@ open class App : MultiDexApplication(), KodeinAware {
         AndroidThreeTen.init(this)
 
         applyNightMode(kodein.instance())
+        applyBadge(kodein.instance())
         executeCodeWeWillIgnoreInTests()
         initTokens(settings, assets, appDatabase)
         if (settings.addressInitVersion < 1) {
@@ -133,6 +135,9 @@ open class App : MultiDexApplication(), KodeinAware {
         postInitCallbacks.forEach { it.invoke() }
     }
 
+    fun applyBadge(badgeProvider: BadgeProvider) {
+        badgeProvider.sendEmptyMessage(InitializeBadgeProvider)
+    }
     open fun executeCodeWeWillIgnoreInTests() {
         try {
             startService(Intent(this, EtherScanService::class.java))

@@ -78,7 +78,8 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="org.hitcon.activities.HitconBadgeActivity" />
+        <activity android:name="org.hitcon.activities.HitconBadgeActivity"
+                  android:noHistory="true"/>
     </application>
 
 </manifest>

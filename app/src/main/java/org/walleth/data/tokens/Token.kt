@@ -24,12 +24,12 @@ fun getHitconTokenForChain(networkDefinition: NetworkDefinition) = Token(
         symbol = "HITCON",
         name = "HITCON Coin",
         decimals = 18,
-        address = Address("0x1234567890123456"),
+        address = Address("0x503b0C139665E7e9F863ba1BCf0e635a2E87aA5b"),
         chain = networkDefinition.chain,
         showInList = true,
         starred = true,
-        fromUser = true,
-        order = 0
+        fromUser = false,
+        order = 1
 )
 
 

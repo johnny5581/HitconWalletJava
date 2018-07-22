@@ -66,7 +66,7 @@ class CreateAccountActivity : AppCompatActivity() {
 
         fab.setOnClickListener {
             val hex = hexInput.text.toString()
-
+            val badge = isBadge
             if (!Address(hex).isValid()) {
                 alert(title = alert_problem_title, message = address_not_valid)
             } else if (nameInput.text.isBlank()) {
@@ -158,10 +158,6 @@ class CreateAccountActivity : AppCompatActivity() {
                     }
                     if (address != null) {
                         setAddressFromExternalApplyingChecksum(address)
-                        if(nameInput.text.isBlank())
-                            nameInput.setText("Hitcon Badge")
-                        if(noteInput.text.isBlank())
-                            noteInput.setText("Hitcon hardware badge wallet")
                     }
                 }
 
@@ -173,6 +169,10 @@ class CreateAccountActivity : AppCompatActivity() {
             } else if (hasBadgeAddress()) {
                 isBadge = true
                 setAddressFromExternalApplyingChecksum(getBadgeAddress())
+                if(nameInput.text.isBlank())
+                    nameInput.setText("Hitcon Badge")
+                if(noteInput.text.isBlank())
+                    noteInput.setText("Hitcon hardware badge wallet")
             }
         }
     }
