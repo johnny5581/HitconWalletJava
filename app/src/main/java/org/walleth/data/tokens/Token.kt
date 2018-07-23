@@ -6,7 +6,7 @@ import org.kethereum.model.ChainDefinition
 import org.walleth.data.networks.NetworkDefinition
 
 fun Token.isETH() = address.hex == "0x0"
-fun Token.isHITCON() = address.hex == ""
+fun Token.isHITCON() = address.hex.toLowerCase() == "0x503b0C139665E7e9F863ba1BCf0e635a2E87aA5b".toLowerCase()
 
 fun getEthTokenForChain(networkDefinition: NetworkDefinition) = Token(
         symbol = "ETH",

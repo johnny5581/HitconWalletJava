@@ -10,6 +10,7 @@ interface Settings {
 
     var chain: Long
     var accountAddress: String?
+    var badgeFlag: Boolean
 
     var addressInitVersion: Int
     var tokensInitVersion: Int

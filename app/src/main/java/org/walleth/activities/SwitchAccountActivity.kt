@@ -12,7 +12,7 @@ class SwitchAccountActivity : BaseAddressBookActivity() {
     }
 
     override fun onAddressClick(addressEntry: AddressBookEntry) {
-        currentAddressProvider.setCurrent(addressEntry.address)
+        currentAddressProvider.setCurrentAccount(addressEntry)
         finish()
     }
 }

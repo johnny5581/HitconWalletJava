@@ -21,6 +21,7 @@ import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.hitcon.activities.HitconBadgeActivity
+import org.hitcon.activities.getTransaction
 import org.kethereum.contract.abi.types.convertStringToABIType
 import org.kethereum.erc681.ERC681
 import org.kethereum.erc681.generateURL
@@ -108,7 +109,13 @@ class CreateTransactionActivity : AppCompatActivity() {
                 onCurrentTokenChanged()
             }
             6522 -> if (resultCode == Activity.RESULT_OK) {
-                storeDefaultGasPrice()
+                async(UI) {
+                    val transaction = intent.getTransaction().transaction
+                    async(CommonPool) {
+                        appDatabase.transactions.upsert(transaction.toEntity(signatureData = null, transactionState = TransactionState()))
+                    }.await()
+                    storeDefaultGasPrice()
+                }
             }
 
             else -> data?.let {

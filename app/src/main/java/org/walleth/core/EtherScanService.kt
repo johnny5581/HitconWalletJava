@@ -10,6 +10,7 @@ import kotlinx.coroutines.experimental.launch
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.hitcon.BadgeProvider
 import org.json.JSONException
 import org.json.JSONObject
 import org.kethereum.functions.encodeRLP
@@ -25,6 +26,7 @@ import org.walleth.data.networks.NetworkDefinition
 import org.walleth.data.networks.NetworkDefinitionProvider
 import org.walleth.data.tokens.CurrentTokenProvider
 import org.walleth.data.tokens.isETH
+import org.walleth.data.tokens.isHITCON
 import org.walleth.data.transactions.TransactionEntity
 import org.walleth.data.transactions.setHash
 import org.walleth.khex.toHexString
@@ -38,6 +40,7 @@ class EtherScanService : LifecycleService() {
 
     private val okHttpClient: OkHttpClient by lazyKodein.instance()
     private val currentAddressProvider: CurrentAddressProvider by lazyKodein.instance()
+    private val badgeProvider: BadgeProvider by lazyKodein.instance()
     private val tokenProvider: CurrentTokenProvider by lazyKodein.instance()
     private val appDatabase: AppDatabase by lazyKodein.instance()
     private val networkDefinitionProvider: NetworkDefinitionProvider by lazyKodein.instance()
@@ -204,6 +207,8 @@ class EtherScanService : LifecycleService() {
                                         chain = currentNetwork.chain
                                 )
                         )
+                        if(currentToken.isHITCON())
+                            badgeProvider.startUpdateBalance(currentToken, balanceString)
                     } catch (e: NumberFormatException) {
                         Log.i("could not parse number $balanceString")
                     }

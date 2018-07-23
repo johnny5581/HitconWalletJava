@@ -26,6 +26,7 @@ class AddressViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         when {
             keyStore.hasKeyForForAddress(addressBookEntry.address) -> R.drawable.ic_key
             addressBookEntry.trezorDerivationPath != null -> R.drawable.trezor_icon
+            addressBookEntry.hitconBadgeFlag -> R.drawable.ic_lock_black_24dp
             else -> R.drawable.ic_watch_only
         }.let { itemView.key_indicator.setImageResource(it) }
 

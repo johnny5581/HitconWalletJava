@@ -13,6 +13,7 @@ import java.math.BigInteger
 import java.security.SecureRandom
 
 object KotprefSettings : KotprefModel(), Settings {
+    override var badgeFlag: Boolean by booleanPref(default = false)
 
     override var currentFiat by stringPref(default = "TWD")
     override var startupWarningDone by booleanPref(default = false)

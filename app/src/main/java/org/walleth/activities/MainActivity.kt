@@ -2,10 +2,13 @@ package org.walleth.activities
 
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.*
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
 import android.support.design.widget.BaseTransientBottomBar
 import android.support.design.widget.Snackbar
 import android.support.v7.app.ActionBarDrawerToggle
@@ -14,13 +17,13 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View.INVISIBLE
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main_in_drawer_container.*
 import kotlinx.android.synthetic.main.value.*
+import org.hitcon.activities.HitconBadgeActivity.Companion.REQUEST_ENABLE_BT
 import org.hitcon.activities.KeyHitconQrCode
 import org.hitcon.data.qrcode.HitconQrCodeType
 import org.hitcon.data.qrcode.toHitconQrCode
@@ -49,6 +52,7 @@ import org.walleth.ui.TransactionAdapterDirection.OUTGOING
 import org.walleth.ui.TransactionRecyclerAdapter
 import org.walleth.util.copyToClipboard
 import java.math.BigInteger.ZERO
+
 
 private const val KEY_LAST_PASTED_DATA: String = "LAST_PASTED_DATA"
 
@@ -174,6 +178,17 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main_in_drawer_container)
+
+//        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+//        val adapter = manager.getAdapter()
+//        adapter.disable()
+//        val handler = Handler()
+//        handler.postDelayed(Runnable {
+//            if (adapter == null || !adapter.isEnabled()) {
+//                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+//                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+//            }
+//        }, 1000)
 
         onboardingController.install()
 
