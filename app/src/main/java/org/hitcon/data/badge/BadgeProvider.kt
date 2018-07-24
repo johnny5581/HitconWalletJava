@@ -28,6 +28,7 @@ import org.walleth.kethereum.android.TransactionParcel
 import org.walleth.khex.clean0xPrefix
 import org.walleth.khex.hexToByteArray
 import org.walleth.khex.toHexString
+import org.walleth.khex.toNoPrefixHexString
 import java.lang.reflect.InvocationTargetException
 import java.math.BigDecimal
 import java.nio.ByteBuffer
@@ -120,7 +121,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             }
             MessageReceiveTxn -> {
                 val bytes = msg.data.getByteArray(KeyTxn)
-                val txn = "0x${bytes.toHex()}"
+                val txn = bytes.toHexString()
                 Log.e(TAG, "Tx Hex: $txn")
                 //val transaction = TransactionParcel(Transaction())
                 context.sendBroadcast(Intent().apply {
@@ -302,6 +303,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             if (characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid) {
                 badgeProvider.sendMessage(Message().apply {
                     val value = characteristic?.value?.clone()
+                    Log.e(TAG, "Receive characteristic: ${value?.toNoPrefixHexString()}")
                     what = MessageReceiveTxn
                     data = Bundle().apply { putByteArray(KeyTxn, value) }
                 })

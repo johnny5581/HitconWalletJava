@@ -194,21 +194,24 @@ class HitconBadgeActivity() : AppCompatActivity() {
         override fun handleMessage(msg: Message?) {
             when (msg?.what) {
                 MessageReceiveTxn -> {
+                    activity.dialog?.dismiss()
                     val tx = msg.data.getString(Txn)
-                    launch {
-                        val url = "module=proxy&action=eth_sendRawTransaction&hex=$tx"
-                        val result = activity.getEtherscanResult(url, activity.networkDefinitionProvider.value!!)
+                    if(tx.length > 4) {
+                        launch {
+                            val url = "module=proxy&action=eth_sendRawTransaction&hex=$tx"
+                            val result = activity.getEtherscanResult(url, activity.networkDefinitionProvider.value!!)
 
-                        if (result != null) {
-                            if (result.has("error")) {
-                                var message = result.getJSONObject("error").getString("message")
-                                activity.setResult(99, Intent().apply { putExtra("error", message) })
+                            if (result != null) {
+                                if (result.has("error")) {
+                                    var message = result.getJSONObject("error").getString("message")
+                                    activity.setResult(99, Intent().apply { putExtra("error", message) })
+                                }
+                                else
+                                    activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(Txn, tx) })
                             }
-                            else
-                                activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(Txn, tx) })
                         }
-                        activity.finish()
                     }
+                    activity.finish()
                 }
                 MessageRestartProcess -> activity.handler.post(activity.mainProcess)
             }
