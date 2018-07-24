@@ -179,16 +179,16 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         setContentView(R.layout.activity_main_in_drawer_container)
 
-//        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-//        val adapter = manager.getAdapter()
-//        adapter.disable()
-//        val handler = Handler()
-//        handler.postDelayed(Runnable {
-//            if (adapter == null || !adapter.isEnabled()) {
-//                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-//                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
-//            }
-//        }, 1000)
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val adapter = manager.getAdapter()
+        adapter.disable()
+        val handler = Handler()
+        handler.postDelayed(Runnable {
+            if (adapter == null || !adapter.isEnabled()) {
+                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+            }
+        }, 1000)
 
         onboardingController.install()
 

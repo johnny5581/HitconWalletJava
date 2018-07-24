@@ -12,6 +12,7 @@ import android.support.v7.app.AppCompatActivity
 import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
@@ -109,13 +110,16 @@ class CreateTransactionActivity : AppCompatActivity() {
                 onCurrentTokenChanged()
             }
             6522 -> if (resultCode == Activity.RESULT_OK) {
+                Toast.makeText(this, "Sync...", Toast.LENGTH_SHORT).show()
                 async(UI) {
-                    val transaction = intent.getTransaction().transaction
-                    async(CommonPool) {
-                        appDatabase.transactions.upsert(transaction.toEntity(signatureData = null, transactionState = TransactionState()))
-                    }.await()
                     storeDefaultGasPrice()
                 }
+            } else {
+                var message = data!!.getStringExtra("error")
+                AlertDialog.Builder(this).setMessage(message)
+                        .setPositiveButton("OK") { _, _ ->
+                            finish()
+                        }.create().show()
             }
 
             else -> data?.let {
@@ -271,15 +275,15 @@ class CreateTransactionActivity : AppCompatActivity() {
             alert(R.string.create_tx_error_address_must_be_specified)
         } else if (currentAmount == null && currentERC681?.function == null) {
             alert(R.string.create_tx_error_amount_must_be_specified)
-        } else if (currentTokenProvider.currentToken.isETH() && currentAmount?:ZERO + gas_price_input.asBigInit() * gas_limit_input.asBigInit() > currentBalanceSafely()) {
+        } else if (currentTokenProvider.currentToken.isETH() && currentAmount ?: ZERO + gas_price_input.asBigInit() * gas_limit_input.asBigInit() > currentBalanceSafely()) {
             alert(R.string.create_tx_error_not_enough_funds)
         } else if (nonce_input.text.isBlank()) {
             alert(title = R.string.nonce_invalid, message = R.string.please_enter_name)
         } else {
             if (currentTokenProvider.currentToken.isETH() && currentERC681?.function == null && currentAmount == ZERO) {
-                question(R.string.create_tx_zero_amount, R.string.alert_problem_title, DialogInterface.OnClickListener({ _, _ -> startTransaction(isTrezorTransaction,isBadgeTransaction) }))
+                question(R.string.create_tx_zero_amount, R.string.alert_problem_title, DialogInterface.OnClickListener({ _, _ -> startTransaction(isTrezorTransaction, isBadgeTransaction) }))
             } else if (!currentTokenProvider.currentToken.isETH() && currentAmount!! > currentBalanceSafely()) {
-                question(R.string.create_tx_negative_token_balance, R.string.alert_problem_title, DialogInterface.OnClickListener { _, _ -> startTransaction(isTrezorTransaction,isBadgeTransaction) })
+                question(R.string.create_tx_negative_token_balance, R.string.alert_problem_title, DialogInterface.OnClickListener { _, _ -> startTransaction(isTrezorTransaction, isBadgeTransaction) })
             } else {
                 startTransaction(isTrezorTransaction, isBadgeTransaction)
             }
@@ -288,7 +292,7 @@ class CreateTransactionActivity : AppCompatActivity() {
 
     private fun startTransaction(isTrezorTransaction: Boolean, isBadgeTransaction: Boolean) {
         val transaction = (if (currentTokenProvider.currentToken.isETH()) createTransactionWithDefaults(
-                value = currentAmount?:ZERO,
+                value = currentAmount ?: ZERO,
                 to = currentToAddress!!,
                 from = currentAddressProvider.getCurrent()
         ) else createTransactionWithDefaults(
@@ -427,7 +431,8 @@ class CreateTransactionActivity : AppCompatActivity() {
 
                         // when called from onCreate() the afterEdwer outage foit hook is not yet added
                         setAmountFromETHString(amount_input.text.toString())
-                        amount_value.setValue(currentAmount ?: ZERO, currentTokenProvider.currentToken)
+                        amount_value.setValue(currentAmount
+                                ?: ZERO, currentTokenProvider.currentToken)
                     }
                 }
 
@@ -502,7 +507,8 @@ class CreateTransactionActivity : AppCompatActivity() {
 
     private fun showWarningOnWrongNetwork(erc681: ERC681): Boolean {
         if (erc681.chainId != null && erc681.chainId != networkDefinitionProvider.getCurrent().chain.id) {
-            val chainForTransaction = getNetworkDefinitionByChainID(erc681.chainId!!)?.getNetworkName() ?: erc681.chainId
+            val chainForTransaction = getNetworkDefinitionByChainID(erc681.chainId!!)?.getNetworkName()
+                    ?: erc681.chainId
             val currentNetworkName = networkDefinitionProvider.getCurrent().getNetworkName()
             val message = getString(R.string.please_switch_network, currentNetworkName, chainForTransaction)
             alert(title = getString(R.string.wrong_network), message = message)

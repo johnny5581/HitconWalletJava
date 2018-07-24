@@ -21,12 +21,31 @@ import android.widget.Toast
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
+import kotlinx.coroutines.experimental.launch
+import okhttp3.Call
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.hitcon.BadgeProvider
 import org.hitcon.data.qrcode.HitconQrCode
 import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.getTxn
+import org.json.JSONException
+import org.json.JSONObject
+import org.kethereum.functions.encodeRLP
+import org.kethereum.model.Transaction
+import org.ligi.kaxt.letIf
+import org.walleth.BuildConfig
 import org.walleth.R
+import org.walleth.data.AppDatabase
+import org.walleth.data.networks.CurrentAddressProvider
+import org.walleth.data.networks.NetworkDefinition
+import org.walleth.data.networks.NetworkDefinitionProvider
+import org.walleth.data.tokens.CurrentTokenProvider
+import org.walleth.data.transactions.setHash
 import org.walleth.kethereum.android.TransactionParcel
+import org.walleth.khex.toHexString
+import java.io.IOException
+import java.security.cert.CertPathValidatorException
 
 const val KeyTransaction = "hitcon_transaction"
 const val KeyHitconQrCode = "hitcon_qr_code";
@@ -36,7 +55,7 @@ fun Intent.getHitconQrCode() = this.getParcelableExtra<HitconQrCode>(KeyHitconQr
 fun Intent.hasBadgeAddress() = this.hasExtra(KeyHitconBadgeAddress)
 fun Intent.getBadgeAddress() = this.getStringExtra(KeyHitconBadgeAddress)
 fun Intent.hasTransaction() = this.hasExtra(KeyTransaction)
-fun Intent.getTransaction() = this.getParcelableExtra<TransactionParcel>(KeyTransaction)
+fun Intent.getTransaction() = this.getStringExtra(KeyTransaction)
 fun Intent.hasTx() = this.hasExtra("TX")
 fun Intent.getTx() = this.getParcelableExtra<TransactionParcel>("TX").transaction
 class HitconBadgeActivity() : AppCompatActivity() {
@@ -49,10 +68,15 @@ class HitconBadgeActivity() : AppCompatActivity() {
         const val REQUEST_ENABLE_BT = 1005
     }
 
-    private val badgeProvider: BadgeProvider by LazyKodein(appKodein).instance()
+    private val lazyKodein = LazyKodein(appKodein)
+
+    private val okHttpClient: OkHttpClient by lazyKodein.instance()
+    private val badgeProvider: BadgeProvider by lazyKodein.instance()
+    private val networkDefinitionProvider: NetworkDefinitionProvider by lazyKodein.instance()
     private val handler = Handler(this)
     private var dialog: ProgressDialog? = null
     private val receiverTxn = TxnReceiver(handler)
+    private var transaction: Transaction? = null
     private val mainProcess = Runnable {
         if (intent.hasHitconQrCode()) {
             handleInitialize(intent.getHitconQrCode().data)
@@ -116,23 +140,16 @@ class HitconBadgeActivity() : AppCompatActivity() {
         } else if (intent.hasTx()) {
             //intent has text, need sign
             dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Waiting for transaction...")
-            badgeProvider.startTransaction(intent.getTx())
+            transaction = intent.getTx()
+            badgeProvider.startTransaction(transaction!!)
         }
-    }
-    private val enableBtProcess = Runnable {
-        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val adapter = manager.adapter
-        if (!adapter.isEnabled) {
-            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
-        }
-
     }
 
     private class TxnReceiver(val handler: android.os.Handler) : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             handler.sendMessage(Message().apply {
                 what = MessageReceiveTxn
-                data.putString(Txn, intent?.getTxn())
+                data.putString(Txn, intent?.getTransaction())
             })
         }
     }
@@ -140,21 +157,58 @@ class HitconBadgeActivity() : AppCompatActivity() {
 
     private class BadgeStateReceiver(val handler: android.os.Handler) : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            handler.sendMessage(Message().apply {
-                what = MessageReceiveTxn
-                data.putString(Txn, intent?.getTxn())
-            })
+
         }
     }
 
+    private fun getEtherscanResult(requestString: String, networkDefinition: NetworkDefinition) = try {
+        getEtherscanResult(requestString, networkDefinition, true)
+    } catch (e: CertPathValidatorException) {
+        getEtherscanResult(requestString, networkDefinition, true)
+    }
+
+    private fun getEtherscanResult(requestString: String, networkDefinition: NetworkDefinition, httpFallback: Boolean): JSONObject? {
+        val baseURL = networkDefinition.getBlockExplorer().baseAPIURL.letIf(httpFallback) {
+            replace("https://", "http://") // :-( https://github.com/walleth/walleth/issues/134 )
+        }
+        val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
+        val url = Request.Builder().url(urlString).build()
+        val newCall: Call = okHttpClient.newCall(url)
+
+        try {
+            val resultString = newCall.execute().body().use { it?.string() }
+            resultString.let {
+                return JSONObject(it)
+            }
+        } catch (ioe: IOException) {
+            ioe.printStackTrace()
+        } catch (jsonException: JSONException) {
+            jsonException.printStackTrace()
+        }
+
+        return null
+    }
 
     private class Handler(val activity: HitconBadgeActivity) : android.os.Handler() {
+
         override fun handleMessage(msg: Message?) {
             when (msg?.what) {
                 MessageReceiveTxn -> {
                     val tx = msg.data.getString(Txn)
-                    activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(Txn, tx) })
-                    activity.finish()
+                    launch {
+                        val url = "module=proxy&action=eth_sendRawTransaction&hex=$tx"
+                        val result = activity.getEtherscanResult(url, activity.networkDefinitionProvider.value!!)
+
+                        if (result != null) {
+                            if (result.has("error")) {
+                                var message = result.getJSONObject("error").getString("message")
+                                activity.setResult(99, Intent().apply { putExtra("error", message) })
+                            }
+                            else
+                                activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(Txn, tx) })
+                        }
+                        activity.finish()
+                    }
                 }
                 MessageRestartProcess -> activity.handler.post(activity.mainProcess)
             }
@@ -187,12 +241,22 @@ class HitconBadgeActivity() : AppCompatActivity() {
 //                    if (adapter.isEnabled) {
 //                        Log.d(TAG, "disable adapter")
 //                        adapter.disable()
-//                        handler.postDelayed(enableBtProcess, 1000)
+//                        handler.postDelayed({
+//                            val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+//                            val adapter = manager.adapter
+//                            if (!adapter.isEnabled) {
+//                                startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
+//                            }
+//                        }, 1000)
 //                    } else {
-//                        handler.post(enableBtProcess)
+//                        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+//                        val adapter = manager.adapter
+//                        if (!adapter.isEnabled) {
+//                            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
+//                        }
 //                    }
 //                } else
-                    handler.post(mainProcess)
+                handler.post(mainProcess)
             }
         }
     }
@@ -202,7 +266,6 @@ class HitconBadgeActivity() : AppCompatActivity() {
         registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
 
 
-
     }
 
     private fun handleInitialize(data: Map<String, String>) {
@@ -210,7 +273,8 @@ class HitconBadgeActivity() : AppCompatActivity() {
         Log.d(TAG, "service uuid: ${init.service}")
         dialog = ProgressDialog.show(this@HitconBadgeActivity, "Hitcon Badge", "Connecting...")
         badgeProvider.initializeBadge(init, object : BadgeProvider.BadgeCallback {
-            override fun onMtuChanged() {dialog?.dismiss()
+            override fun onMtuChanged() {
+                dialog?.dismiss()
                 this@HitconBadgeActivity.setResult(Activity.RESULT_OK, Intent().apply { putExtra(KeyHitconBadgeAddress, init.address) })
                 this@HitconBadgeActivity.finish()
             }
@@ -289,8 +353,9 @@ class HitconBadgeActivity() : AppCompatActivity() {
         }
     }
 
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        when(requestCode) {
+        when (requestCode) {
             REQUEST_ENABLE_BT -> handler.post(mainProcess)
         }
     }

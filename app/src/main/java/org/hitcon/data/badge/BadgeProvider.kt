@@ -42,7 +42,7 @@ import javax.crypto.spec.SecretKeySpec
 
 fun Intent.hasTxn() = this.hasExtra(KeyTxn)
 fun Intent.getTxn() = this.getStringExtra(KeyTxn)
-fun String.padZero() = if(this.length % 2 == 0) this else "0$this"
+fun String.padZero() = if (this.length % 2 == 0) this else "0$this"
 fun Double.toByteArray() = ByteBuffer.allocate(8).putDouble(this).array().reversed()
 const val KeyTxn = "Txn"
 const val KeyMtu = "Mtu"
@@ -96,8 +96,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private var leScanner: BluetoothLeScanner? = adapter.bluetoothLeScanner
     private var mtu = 512
     private val delay = 15 * 1000L
-    private var iv: ByteArray = ByteArray(16)
-    private var transaction:Transaction? = null
+    private var txIV: ByteArray = ByteArray(16)
+    private var baIV: ByteArray = ByteArray(16)
+    private var transaction: Transaction? = null
     private var transacting = transaction != null
 
     init {
@@ -118,12 +119,13 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             MessageMtuFailure -> {
             }
             MessageReceiveTxn -> {
-                transaction = null
-                val txn  = getDecryptText(msg.data.getByteArray(KeyTxn))
-                val transaction = TransactionParcel(Transaction())
+                val bytes = msg.data.getByteArray(KeyTxn)
+                val txn = "0x${bytes.toHex()}"
+                Log.e(TAG, "Tx Hex: $txn")
+                //val transaction = TransactionParcel(Transaction())
                 context.sendBroadcast(Intent().apply {
                     action = ActionReceiveTxn
-                    putExtra(KeyTransaction, transaction)
+                    putExtra(KeyTransaction, txn)
                 })
             }
             MessageGattConnectionChanged -> {
@@ -292,15 +294,16 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?) {
-            if(characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid)
+            if (characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid)
                 gatt?.readCharacteristic(characteristic)
         }
 
         override fun onCharacteristicRead(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
             if (characteristic?.uuid == badgeProvider.services[HitconBadgeServices.Txn]?.uuid) {
                 badgeProvider.sendMessage(Message().apply {
+                    val value = characteristic?.value?.clone()
                     what = MessageReceiveTxn
-                    data = Bundle().apply { putByteArray(KeyTxn, characteristic?.value) }
+                    data = Bundle().apply { putByteArray(KeyTxn, value) }
                 })
             }
 
@@ -350,9 +353,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         } else {
             Log.d(TAG, "gatt instance exist, reconnect")
         }
-        gatt?.disconnect()
-        gatt?.connect()
-        //gatt?.let { refreshGatt(it) }
+        //gatt?.disconnect()
+        //gatt?.connect()
+        gatt?.let { refreshGatt(it) }
     }
 
     /**
@@ -409,19 +412,19 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         val hgaslimit = transaction.gasLimit.toHexString().clean0xPrefix().padZero()
         val hgas = transaction.gasPrice.toHexString().clean0xPrefix().padZero()
         val hnoice = transaction.nonce!!.toHexString().clean0xPrefix().padZero()
-        val hdata =  transaction.input.toHexString().clean0xPrefix()
+        val hdata = transaction.input.toHexString("")
         var transArray =
-                        "01" + String.format("%02X", haddress.length / 2) + haddress +
+                "01" + String.format("%02X", haddress.length / 2) + haddress +
                         "02" + String.format("%02X", hvalue.length / 2) + hvalue +
                         "03" + String.format("%02X", hgas.length / 2) + hgas +
                         "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
                         "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
                         "06" + String.format("%02X", hdata!!.length / 2) + hdata
 
-        SecureRandom(iv)
+        SecureRandom(txIV)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
-        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
+        val enc = (txIV.toHexString("") + encrypt(txIV, aeskey!!, ptext).toHexString("")).hexToByteArray()
         val cha = services[HitconBadgeServices.Transaction]
         cha?.value = enc
         gatt?.writeCharacteristic(cha)
@@ -429,25 +432,24 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         enableNotifications(services[HitconBadgeServices.Txn]!!)
     }
 
-    fun startUpdateBalance(token: Token, balance:String) {
-        if(entity == null || !connected || transacting) return
+    fun startUpdateBalance(token: Token, balance: String) {
+        if (entity == null || !connected || transacting) return
 
         val haddress = token.address.cleanHex
         val balanceValue = balance.toBigDecimal().scaleByPowerOfTen(-token.decimals).toDouble()
         //val balanceValue = 100.0
         val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
         var transArray =
-                        "01" + String.format("%02X", haddress.length / 2) + haddress +
+                "01" + String.format("%02X", haddress.length / 2) + haddress +
                         "02" + String.format("%02X", hvalue.length / 2) + hvalue
 
-        SecureRandom(iv)
+        SecureRandom(baIV)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
-        val enc = (iv.toHex() + encrypt(iv, aeskey!!, ptext).toHex()).hexToByteArray()
+        val enc = (baIV.toHex() + encrypt(baIV, aeskey!!, ptext).toHex()).hexToByteArray()
         val cha = services[HitconBadgeServices.Balance]
         cha?.value = enc
-        gatt?.writeCharacteristic(cha)
-
+        cha?.let { gatt?.writeCharacteristic(it) }
     }
 
 
@@ -467,7 +469,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
 
     private fun getDecryptText(cyber: ByteArray): String {
-        return decrypt(iv, entity!!.key!!.toByteArray(), cyber).toString(Charset.defaultCharset())
+        return decrypt(txIV, entity!!.key!!.toByteArray(), cyber).toHexString()
     }
 
 

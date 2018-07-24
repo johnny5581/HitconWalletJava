@@ -16,6 +16,7 @@ import org.ligi.compat.HtmlCompat
 import org.ligi.kaxt.doAfterEdit
 import org.ligi.kaxt.setVisibility
 import org.walleth.R
+import org.walleth.data.config.Settings
 import org.walleth.data.networks.CurrentAddressProvider
 import org.walleth.data.networks.NetworkDefinitionProvider
 import org.walleth.data.networks.isNoTestNet
@@ -31,7 +32,7 @@ class RequestActivity : AppCompatActivity() {
     private val currentAddressProvider: CurrentAddressProvider by LazyKodein(appKodein).instance()
     private val currentTokenProvider: CurrentTokenProvider by LazyKodein(appKodein).instance()
     private val networkDefinitionProvider: NetworkDefinitionProvider by LazyKodein(appKodein).instance()
-
+    private val settings: Settings by LazyKodein(appKodein).instance()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -70,31 +71,45 @@ class RequestActivity : AppCompatActivity() {
     private fun refreshQR() {
 
         val currentToken = currentTokenProvider.currentToken
+
         if (currentToken.isETH()) {
 
             val relevantAddress = currentAddressProvider.getCurrent()
-            currentERC67String = ERC681(address = relevantAddress.hex).generateURL()
 
-            if (add_value_checkbox.isChecked) {
-                try {
-                    currentERC67String = ERC681(address = relevantAddress.hex, value = value_input_edittext.text.toString().extractValueForToken(currentToken)).generateURL()
-                } catch (e: NumberFormatException) {
+            if(settings.badgeFlag) {
+                currentERC67String = relevantAddress.hex
+            } else {
+                currentERC67String = ERC681(address = relevantAddress.hex).generateURL()
+
+                if (add_value_checkbox.isChecked) {
+                    try {
+                        currentERC67String = ERC681(address = relevantAddress.hex, value = value_input_edittext.text.toString().extractValueForToken(currentToken)).generateURL()
+                    } catch (e: NumberFormatException) {
+                    }
                 }
             }
+
+
+
         } else {
-            val relevantAddress = currentToken.address.hex
+            if(settings.badgeFlag) {
+                currentERC67String = currentAddressProvider.getCurrent().hex
+            } else {
+                val relevantAddress = currentToken.address.hex
 
-            val userAddress = currentAddressProvider.getCurrent().hex
-            val functionParams = mutableListOf("address" to userAddress)
-            if (add_value_checkbox.isChecked) {
-                try {
-                    functionParams.add("uint256" to value_input_edittext.text.toString().extractValueForToken(currentToken).toString())
-                } catch (e: NumberFormatException) {
+                val userAddress = currentAddressProvider.getCurrent().hex
+                val functionParams = mutableListOf("address" to userAddress)
+                if (add_value_checkbox.isChecked) {
+                    try {
+                        functionParams.add("uint256" to value_input_edittext.text.toString().extractValueForToken(currentToken).toString())
+                    } catch (e: NumberFormatException) {
+                    }
                 }
+
+                currentERC67String = ERC681(address = relevantAddress, function = "transfer",
+                        functionParams = functionParams).generateURL()
             }
 
-            currentERC67String = ERC681(address = relevantAddress, function = "transfer",
-                    functionParams = functionParams).generateURL()
         }
 
         receive_qrcode.setQRCode(currentERC67String)
