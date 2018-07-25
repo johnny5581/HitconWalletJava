@@ -22,7 +22,10 @@ import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.helper.toHex
 import org.kethereum.model.Transaction
 import org.walleth.data.AppDatabase
+import org.walleth.data.networks.NetworkDefinitionProvider
 import org.walleth.data.tokens.Token
+import org.walleth.data.tokens.getHitconTokenForChain
+import org.walleth.data.tokens.isHITCON
 import org.walleth.functions.toHexString
 import org.walleth.kethereum.android.TransactionParcel
 import org.walleth.khex.clean0xPrefix
@@ -99,6 +102,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private val delay = 15 * 1000L
     private var txIV: ByteArray = ByteArray(16)
     private var baIV: ByteArray = ByteArray(16)
+    private var ethIV: ByteArray = ByteArray(16)
     private var transaction: Transaction? = null
     private var transacting = transaction != null
 
@@ -408,6 +412,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
 
     fun startTransaction(transaction: org.kethereum.model.Transaction) {
+        Log.i(TAG, "start transaction")
         this.transaction = transaction
         val haddress = transaction.to.toString().clean0xPrefix()
         val hvalue = transaction.value.toHexString().clean0xPrefix().padZero()
@@ -422,11 +427,18 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                         "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
                         "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
                         "06" + String.format("%02X", hdata!!.length / 2) + hdata
-
-        SecureRandom(txIV)
+        Log.d(TAG, "01(haddress): $haddress")
+        Log.d(TAG, "02(hvalue): $hvalue")
+        Log.d(TAG, "03(hgas): $hgas")
+        Log.d(TAG, "04(hgaslimit): $hgaslimit")
+        Log.d(TAG, "05(hnoice): $hnoice")
+        Log.d(TAG, "06(hdata): $hdata")
+        Log.d(TAG, "transArray: $transArray")
+        SecureRandom().nextBytes(txIV)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
         val enc = (txIV.toHexString("") + encrypt(txIV, aeskey!!, ptext).toHexString("")).hexToByteArray()
+        Log.d(TAG, "enc(transArray): ${enc.toHexString()}")
         val cha = services[HitconBadgeServices.Transaction]
         cha?.value = enc
         gatt?.writeCharacteristic(cha)
@@ -434,9 +446,71 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         enableNotifications(services[HitconBadgeServices.Txn]!!)
     }
 
+    private fun getTransArrayBalance(haddress: String, hvalue: String): String {
+        return "01" + String.format("%02X", haddress.length / 2) + haddress +
+                "02" + String.format("%02X", hvalue.length / 2) + hvalue
+    }
+
+    fun startUpdateBalance(ethBalance: String?, hitconBalance: String?, token: Token) {
+        if (entity == null || !connected || transacting) return
+        Log.i(TAG, "start update balance, eth raw: '$ethBalance', hitcon raw: '$hitconBalance'")
+
+        var transArray: String = ""
+        if (ethBalance != null) {
+            val haddress = entity!!.address!!
+            val balanceValue = ethBalance.toBigDecimal().scaleByPowerOfTen(-18).toDouble()
+            val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
+            val trans = getTransArrayBalance(haddress, hvalue)
+            Log.d(TAG, "trans eth raw: $trans")
+            transArray += trans
+        }
+
+        if (hitconBalance != null && token.isHITCON()) {
+            val haddress = token.address.cleanHex
+            val balanceValue = hitconBalance.toBigDecimal().scaleByPowerOfTen(-token.decimals).toDouble()
+            val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
+            val trans = getTransArrayBalance(haddress, hvalue)
+            Log.d(TAG, "trans hitcon token raw: $trans")
+            transArray += trans
+        }
+
+        if(transArray.isNotEmpty()) {
+            Log.d(TAG, "raw transArray is $transArray, start update")
+            SecureRandom().nextBytes(ethIV)
+            val aeskey = entity!!.key!!.hexToByteArray()
+            val ptext = transArray.hexToByteArray()
+            val enc = (ethIV.toHex() + encrypt(ethIV, aeskey!!, ptext).toHex()).hexToByteArray()
+            val cha = services[HitconBadgeServices.Balance]
+            cha?.value = enc
+            cha?.let { gatt?.writeCharacteristic(it) }
+        }
+        else
+            Log.d(TAG, "no data need update, do nothing")
+        Log.i(TAG, "finish update balance")
+    }
+
+    fun startUpdateBalance(balance: String) {
+        if (entity == null || !connected || transacting) return
+        Log.i(TAG, "start update eth balance, raw: '$balance'")
+        val haddress = entity!!.address!!
+        val balanceValue = balance.toBigDecimal().scaleByPowerOfTen(-18).toDouble()
+        val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
+        var transArray =
+                "01" + String.format("%02X", haddress.length / 2) + haddress +
+                        "02" + String.format("%02X", hvalue.length / 2) + hvalue
+
+        SecureRandom().nextBytes(ethIV)
+        val aeskey = entity!!.key!!.hexToByteArray()
+        val ptext = transArray.hexToByteArray()
+        val enc = (ethIV.toHex() + encrypt(ethIV, aeskey!!, ptext).toHex()).hexToByteArray()
+        val cha = services[HitconBadgeServices.Balance]
+        cha?.value = enc
+        cha?.let { gatt?.writeCharacteristic(it) }
+    }
+
     fun startUpdateBalance(token: Token, balance: String) {
         if (entity == null || !connected || transacting) return
-
+        Log.i(TAG, "start update token '${token.name}' balance, raw: '$balance'")
         val haddress = token.address.cleanHex
         val balanceValue = balance.toBigDecimal().scaleByPowerOfTen(-token.decimals).toDouble()
         //val balanceValue = 100.0
@@ -445,7 +519,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                 "01" + String.format("%02X", haddress.length / 2) + haddress +
                         "02" + String.format("%02X", hvalue.length / 2) + hvalue
 
-        SecureRandom(baIV)
+        SecureRandom().nextBytes(baIV)
         val aeskey = entity!!.key!!.hexToByteArray()
         val ptext = transArray.hexToByteArray()
         val enc = (baIV.toHex() + encrypt(baIV, aeskey!!, ptext).toHex()).hexToByteArray()

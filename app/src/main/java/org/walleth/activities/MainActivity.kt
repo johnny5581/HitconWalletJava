@@ -17,6 +17,7 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View.INVISIBLE
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
@@ -72,7 +73,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private var balanceLiveData: LiveData<Balance>? = null
     private var etherLiveData: LiveData<Balance>? = null
     private val onboardingController by lazy { OnboardingController(this, settings) }
-
     private var lastPastedData: String? = null
 
     override fun onResume() {
@@ -179,18 +179,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         setContentView(R.layout.activity_main_in_drawer_container)
 
-        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val adapter = manager.getAdapter()
-        adapter.disable()
-        val handler = Handler()
-        handler.postDelayed(Runnable {
-            if (adapter == null || !adapter.isEnabled()) {
-                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
-            }
-        }, 1000)
-
-        onboardingController.install()
+        //onboardingController.install()
 
         settings.registerListener(this)
 
@@ -199,7 +188,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         drawer_layout.addDrawerListener(actionBarDrawerToggle)
 
         receive_container.setOnClickListener {
-            onboardingController.dismiss()
+            //onboardingController.dismiss()
             startActivityFromClass(RequestActivity::class)
         }
 
@@ -301,11 +290,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     }
 
     private val etherObserver = Observer<Balance> {
-//        if (it != null) {
-//            send_container.setVisibility(it.balance > ZERO, INVISIBLE)
-//        } else {
-//            send_container.visibility = INVISIBLE
-//        }
+        if (it != null) {
+            send_container.setVisibility(it.balance > ZERO, INVISIBLE)
+        } else {
+            send_container.visibility = INVISIBLE
+        }
     }
 
     private fun setCurrentBalanceObservers() {

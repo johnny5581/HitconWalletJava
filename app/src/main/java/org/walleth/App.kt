@@ -78,7 +78,7 @@ open class App : MultiDexApplication(), KodeinAware {
             bind<CurrentTokenProvider>() with singleton { CurrentTokenProvider(instance()) }
             bind<AppDatabase>() with singleton { Room.databaseBuilder(applicationContext, AppDatabase::class.java, "maindb").build() }
             bind<NetworkDefinitionProvider>() with singleton { NetworkDefinitionProvider(instance()) }
-            bind<CurrentAddressProvider>() with singleton { InitializingCurrentAddressProvider(gethBackedWallethKeyStore, instance(), instance(), applicationContext) }
+            bind<CurrentAddressProvider>() with singleton { InitializingCurrentAddressProvider(gethBackedWallethKeyStore, instance(), instance(), applicationContext,instance()) }
             bind<FourByteDirectory>() with singleton { FourByteDirectoryImpl(instance(), applicationContext) }
         }
     }
@@ -91,12 +91,12 @@ open class App : MultiDexApplication(), KodeinAware {
     override fun onCreate() {
         super.onCreate()
 
-        if (LeakCanary.isInAnalyzerProcess(this)) {
-            // This process is dedicated to LeakCanary for heap analysis.
-            // You should not init your app in this process.
-            return
-        }
-        LeakCanary.install(this)
+//        if (LeakCanary.isInAnalyzerProcess(this)) {
+//            // This process is dedicated to LeakCanary for heap analysis.
+//            // You should not init your app in this process.
+//            return
+//        }
+//        LeakCanary.install(this)
         // Normal app init code...
 
         if (BuildConfig.DEBUG) {

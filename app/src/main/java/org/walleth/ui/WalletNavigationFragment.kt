@@ -47,8 +47,8 @@ class WalletNavigationFragment : Fragment() {
                 R.id.menu_keys to KeysActivity::class,
                 R.id.menu_accounts to SwitchAccountActivity::class,
                 R.id.menu_offline_transaction to OfflineTransactionActivity::class,
-                R.id.menu_settings to PreferenceActivity::class,
-                R.id.menu_badge to HitconBadgeActivity::class
+                R.id.menu_settings to PreferenceActivity::class
+                //R.id.menu_badge to HitconBadgeActivity::class
         )
 
 

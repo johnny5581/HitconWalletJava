@@ -109,18 +109,22 @@ class CreateTransactionActivity : AppCompatActivity() {
                 setAmountFromETHString(amount_input.text.toString())
                 onCurrentTokenChanged()
             }
-            6522 -> if (resultCode == Activity.RESULT_OK) {
-                Toast.makeText(this, "Sync...", Toast.LENGTH_SHORT).show()
-                async(UI) {
-                    storeDefaultGasPrice()
+            6522 ->
+                if (resultCode == Activity.RESULT_OK) {
+                    async(UI) {
+                        storeDefaultGasPrice()
+                    }
+                    AlertDialog.Builder(this).setMessage("Transaction finish, when pending done, the transaction will display on list")
+                            .setPositiveButton("OK") { _, _ ->
+                                finish()
+                            }.create().show()
+                } else {
+                    var message = data!!.getStringExtra("error")
+                    AlertDialog.Builder(this).setMessage(message)
+                            .setPositiveButton("OK") { _, _ ->
+                                finish()
+                            }.create().show()
                 }
-            } else {
-                var message = data!!.getStringExtra("error")
-                AlertDialog.Builder(this).setMessage(message)
-                        .setPositiveButton("OK") { _, _ ->
-                            finish()
-                        }.create().show()
-            }
 
             else -> data?.let {
                 if (data.hasExtra("HEX")) {

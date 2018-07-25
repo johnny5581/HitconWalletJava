@@ -3,6 +3,7 @@ package org.walleth.data.networks
 import android.content.Context
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.async
+import org.hitcon.BadgeProvider
 import org.kethereum.model.Address
 import org.walleth.R
 import org.walleth.data.AppDatabase
@@ -11,7 +12,7 @@ import org.walleth.data.addressbook.AddressBookEntry
 import org.walleth.data.config.Settings
 import org.walleth.data.keystore.WallethKeyStore
 
-class InitializingCurrentAddressProvider(keyStore: WallethKeyStore, appDatabase: AppDatabase, settings: Settings, context: Context) : CurrentAddressProvider(settings) {
+class InitializingCurrentAddressProvider(keyStore: WallethKeyStore, appDatabase: AppDatabase, settings: Settings, context: Context, badgeProvider: BadgeProvider) : CurrentAddressProvider(settings, badgeProvider) {
 
     init {
         val lastAddress = settings.accountAddress

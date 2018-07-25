@@ -36,7 +36,6 @@ import org.walleth.data.keystore.WallethKeyStore
 
 private const val HEX_INTENT_EXTRA_KEY = "HEX"
 private const val REQUEST_CODE_TREZOR = 7965
-private const val REQUEST_CODE_BADGE = 8072
 
 fun Context.startCreateAccountActivity(hex: String) {
     startActivity(Intent(this, CreateAccountActivity::class.java).apply {
@@ -144,10 +143,10 @@ class CreateAccountActivity : AppCompatActivity() {
                 if (stringExtra.isHitconQrCodeUri()) {
                     var code = stringExtra.toHitconQrCode()
                     if (code.valid) {
-                        intent.putExtra(KeyHitconQrCode, code)
-                        startActivityForResult(Intent(this@CreateAccountActivity, HitconBadgeActivity::class.java).apply {
-                            putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
-                        }, REQUEST_CODE_BADGE)
+                        startBadgeActivityForInitialize(this@CreateAccountActivity, code)
+//                        startActivityForResult(Intent(this@CreateAccountActivity, HitconBadgeActivity::class.java).apply {
+//                            putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
+//                        }, REQUEST_CODE_BADGE)
                     }
 
                 } else {

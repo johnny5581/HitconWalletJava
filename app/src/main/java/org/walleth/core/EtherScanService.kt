@@ -25,6 +25,7 @@ import org.walleth.data.networks.CurrentAddressProvider
 import org.walleth.data.networks.NetworkDefinition
 import org.walleth.data.networks.NetworkDefinitionProvider
 import org.walleth.data.tokens.CurrentTokenProvider
+import org.walleth.data.tokens.getEthTokenForChain
 import org.walleth.data.tokens.isETH
 import org.walleth.data.tokens.isHITCON
 import org.walleth.data.transactions.TransactionEntity
@@ -57,13 +58,15 @@ class EtherScanService : LifecycleService() {
     class TimingModifyingLifecycleObserver : LifecycleObserver {
         @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
         fun connectListener() {
-            timing = 7_000
+            Log.d("Walleth", "change timing $timing")
+            timing = 30_000
             shortcut = true
         }
 
         @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         fun disconnectListener() {
-            timing = 70_000
+            Log.d("Walleth", "change timing $timing")
+            timing = 120_000
         }
     }
 
@@ -163,7 +166,7 @@ class EtherScanService : LifecycleService() {
 
                         val oldEntry = appDatabase.transactions.getByHash(it.hash)
                         //if (oldEntry == null || oldEntry.transactionState.isPending) {
-                            appDatabase.transactions.upsert(it)
+                        appDatabase.transactions.upsert(it)
                         //}
                     }
 
@@ -178,6 +181,7 @@ class EtherScanService : LifecycleService() {
 
         networkDefinitionProvider.value?.let { currentNetwork ->
             val currentToken = tokenProvider.currentToken
+            val ethToken = getEthTokenForChain(currentNetwork)
             val etherscanResult = getEtherscanResult("module=proxy&action=eth_blockNumber", currentNetwork)
 
             if (etherscanResult?.has("result") != true) {
@@ -189,14 +193,27 @@ class EtherScanService : LifecycleService() {
             if (blockNum != null) {
                 lastSeenBalanceBlock = blockNum
 
-                val balanceString = if (currentToken.isETH()) {
-                    getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
 
-                } else {
-                    getEtherscanResult("module=account&action=tokenbalance&contractaddress=${currentToken.address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
+                val ethBalanceString = getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
+                val balanceString = if (!currentToken.isETH()) getEtherscanResult("module=account&action=tokenbalance&contractaddress=${currentToken.address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result") else null
 
+
+
+                if (ethBalanceString != null) {
+                    try {
+                        appDatabase.balances.upsertIfNewerBlock(
+                                Balance(address = Address(addressHex),
+                                        block = blockNum,
+                                        balance = BigInteger(ethBalanceString),
+                                        tokenAddress = ethToken.address,
+                                        chain = currentNetwork.chain
+                                )
+                        )
+
+                    } catch (e: NumberFormatException) {
+                        Log.i("could not parse number $ethBalanceString")
+                    }
                 }
-
                 if (balanceString != null) {
                     try {
                         appDatabase.balances.upsertIfNewerBlock(
@@ -207,12 +224,22 @@ class EtherScanService : LifecycleService() {
                                         chain = currentNetwork.chain
                                 )
                         )
-                        if(currentToken.isHITCON())
-                            badgeProvider.startUpdateBalance(currentToken, balanceString)
                     } catch (e: NumberFormatException) {
                         Log.i("could not parse number $balanceString")
                     }
                 }
+
+
+                badgeProvider.startUpdateBalance(ethBalanceString, balanceString, currentToken)
+//                val balanceString = if (currentToken.isETH()) {
+//                    getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
+//
+//                } else {
+//                    getEtherscanResult("module=account&action=tokenbalance&contractaddress=${currentToken.address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
+//
+//                }
+
+
             }
         }
     }

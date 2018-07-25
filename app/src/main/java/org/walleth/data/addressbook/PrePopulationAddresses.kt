@@ -27,4 +27,4 @@ val faucet = AddressBookEntry(
         trezorDerivationPath = null
 )
 
-val allPrePopulationAddresses = listOf(michael, ligi, faucet)
+val allPrePopulationAddresses = listOf<AddressBookEntry>(/*michael, ligi, faucet*/)
