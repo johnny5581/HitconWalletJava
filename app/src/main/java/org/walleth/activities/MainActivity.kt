@@ -24,8 +24,9 @@ import com.github.salomonbrys.kodein.instance
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main_in_drawer_container.*
 import kotlinx.android.synthetic.main.value.*
-import org.hitcon.activities.HitconBadgeActivity.Companion.REQUEST_ENABLE_BT
-import org.hitcon.activities.KeyHitconQrCode
+import org.hitcon.BadgeProvider
+import org.hitcon.activities.startBadgeActivityForConnection
+import org.hitcon.activities.startBadgeActivityForInitialize
 import org.hitcon.data.qrcode.HitconQrCodeType
 import org.hitcon.data.qrcode.toHitconQrCode
 import org.json.JSONObject
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
     private val syncProgressProvider: SyncProgressProvider by lazyKodein.instance()
     private val networkDefinitionProvider: NetworkDefinitionProvider by lazyKodein.instance()
+    private val badgeProvider: BadgeProvider by lazyKodein.instance()
     private val appDatabase: AppDatabase by lazyKodein.instance()
     private val settings: Settings by lazyKodein.instance()
     private val currentTokenProvider: CurrentTokenProvider by lazyKodein.instance()
@@ -92,7 +94,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         if (code != null) {
             when (code?.type) {
                 HitconQrCodeType.Initialize -> {
-                    startActivity(Intent(baseContext, AddressBookActivity::class.java).apply { putExtra(KeyHitconQrCode, code) })
+                    startBadgeActivityForInitialize(this, code)
                     return
                 }
             }
@@ -265,7 +267,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             installTransactionObservers()
         })
 
-        currentAddressProvider.observe(this, Observer { _ ->
+        currentAddressProvider.observe(this, Observer { address ->
             setCurrentBalanceObservers()
         })
 
@@ -275,6 +277,14 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         if (savedInstanceState != null) {
             lastPastedData = savedInstanceState.getString(KEY_LAST_PASTED_DATA)
+        }
+        if(currentAddressProvider.settings.badgeFlag && !badgeProvider.connected) {
+            AlertDialog.Builder(this)
+                    .setCancelable(false)
+                    .setMessage(getString(R.string.message_current_address_is_badge))
+                    .setPositiveButton(android.R.string.ok) {_,_ -> startBadgeActivityForConnection(this@MainActivity)}
+                    .setNegativeButton(android.R.string.cancel) {_,_ -> }
+                    .create().show()
         }
     }
 

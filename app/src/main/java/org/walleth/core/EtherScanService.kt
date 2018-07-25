@@ -53,20 +53,24 @@ class EtherScanService : LifecycleService() {
 
         private var lastSeenTransactionsBlock = 0L
         private var lastSeenBalanceBlock = 0L
+        private var lastTokenSeenTransactionsBlock = 0L
+        private var lastTokenSeenBalanceBlock = 0L
+        private var lastEthBalance: String = ""
+        private var lastErcBalance: String = ""
     }
 
     class TimingModifyingLifecycleObserver : LifecycleObserver {
         @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
         fun connectListener() {
             Log.d("Walleth", "change timing $timing")
-            timing = 30_000
+            timing = 7_000
             shortcut = true
         }
 
         @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         fun disconnectListener() {
             Log.d("Walleth", "change timing $timing")
-            timing = 120_000
+            timing = 70_000
         }
     }
 
@@ -109,13 +113,14 @@ class EtherScanService : LifecycleService() {
 
     private fun relayTransactionsIfNeeded() {
         appDatabase.transactions.getAllToRelayLive().observe(this, Observer {
-            it?.let { it.filter { it.signatureData != null && !it.transactionState.relayedEtherscan }.forEach { relayTransaction(it) } }
+            it?.let { it.filter { (it.signatureData != null || it.hexData != null) && !it.transactionState.relayedEtherscan }.forEach { relayTransaction(it) } }
         })
     }
 
     private fun relayTransaction(transaction: TransactionEntity) {
         launch {
-            val url = "module=proxy&action=eth_sendRawTransaction&hex=" + transaction.transaction.encodeRLP(transaction.signatureData).toHexString("0x")
+
+            val url ="module=proxy&action=eth_sendRawTransaction&hex=" + (if(transaction.hexData != null) transaction.hexData else transaction.transaction.encodeRLP(transaction.signatureData).toHexString("0x"))
             val result = getEtherscanResult(url, networkDefinitionProvider.value!!)
 
             if (result != null) {
@@ -153,9 +158,10 @@ class EtherScanService : LifecycleService() {
     private fun queryTransactions(addressHex: String) {
         networkDefinitionProvider.value?.let { currentNetwork ->
             val requestString = "module=account&action=txlist&address=$addressHex&startblock=$lastSeenTransactionsBlock&endblock=${lastSeenBalanceBlock + 1L}&sort=asc"
-
+            val tokenRequestString = "module=account&action=tokentx&address=$addressHex&startblock=$lastTokenSeenTransactionsBlock&endblock=${lastTokenSeenBalanceBlock + 1L}&sort=asc"
             try {
                 val etherscanResult = getEtherscanResult(requestString, currentNetwork)
+                val tokenEtherscanResult = getEtherscanResult(tokenRequestString, currentNetwork)
                 if (etherscanResult != null && etherscanResult.has("result")) {
                     val jsonArray = etherscanResult.getJSONArray("result")
                     val newTransactions = parseEtherScanTransactions(jsonArray, currentNetwork.chain)
@@ -164,7 +170,21 @@ class EtherScanService : LifecycleService() {
 
                     newTransactions.list.forEach {
 
-                        val oldEntry = appDatabase.transactions.getByHash(it.hash)
+                        //val oldEntry = appDatabase.transactions.getByHash(it.hash)
+                        //if (oldEntry == null || oldEntry.transactionState.isPending) {
+                        appDatabase.transactions.upsert(it)
+                        //}
+                    }
+                }
+                if (tokenEtherscanResult != null && tokenEtherscanResult.has("result")) {
+                    val jsonArray = tokenEtherscanResult.getJSONArray("result")
+                    val newTransactions = parseEtherScanTransactions(jsonArray, currentNetwork.chain)
+
+                    lastTokenSeenTransactionsBlock = newTransactions.highestBlock
+
+                    newTransactions.list.forEach {
+
+                        //val oldEntry = appDatabase.transactions.getByHash(it.hash)
                         //if (oldEntry == null || oldEntry.transactionState.isPending) {
                         appDatabase.transactions.upsert(it)
                         //}
@@ -197,9 +217,12 @@ class EtherScanService : LifecycleService() {
                 val ethBalanceString = getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
                 val balanceString = if (!currentToken.isETH()) getEtherscanResult("module=account&action=tokenbalance&contractaddress=${currentToken.address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result") else null
 
-
+                var update = false
 
                 if (ethBalanceString != null) {
+                    if(lastErcBalance != ethBalanceString)
+                        update = true
+                    lastEthBalance = ethBalanceString
                     try {
                         appDatabase.balances.upsertIfNewerBlock(
                                 Balance(address = Address(addressHex),
@@ -215,6 +238,9 @@ class EtherScanService : LifecycleService() {
                     }
                 }
                 if (balanceString != null) {
+                    if(lastEthBalance != balanceString)
+                        update = true
+                    lastEthBalance = balanceString
                     try {
                         appDatabase.balances.upsertIfNewerBlock(
                                 Balance(address = Address(addressHex),
@@ -229,8 +255,8 @@ class EtherScanService : LifecycleService() {
                     }
                 }
 
-
-                badgeProvider.startUpdateBalance(ethBalanceString, balanceString, currentToken)
+                if(update && currentAddressProvider.settings.badgeFlag)
+                     badgeProvider.startUpdateBalance(ethBalanceString, balanceString, currentToken)
 //                val balanceString = if (currentToken.isETH()) {
 //                    getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
 //

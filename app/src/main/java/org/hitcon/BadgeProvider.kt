@@ -13,7 +13,7 @@ import android.util.Log
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
-import org.hitcon.activities.KeyTransaction
+import org.hitcon.activities.HitconBadgeActivity.Companion.KeyTransaction
 import org.hitcon.data.badge.BadgeEntity
 import org.hitcon.data.badge.BadgeServiceEntity
 import org.hitcon.data.badge.getLastBadge
@@ -22,34 +22,25 @@ import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.helper.toHex
 import org.kethereum.model.Transaction
 import org.walleth.data.AppDatabase
-import org.walleth.data.networks.NetworkDefinitionProvider
 import org.walleth.data.tokens.Token
-import org.walleth.data.tokens.getHitconTokenForChain
 import org.walleth.data.tokens.isHITCON
 import org.walleth.functions.toHexString
-import org.walleth.kethereum.android.TransactionParcel
 import org.walleth.khex.clean0xPrefix
 import org.walleth.khex.hexToByteArray
 import org.walleth.khex.toHexString
 import org.walleth.khex.toNoPrefixHexString
 import java.lang.reflect.InvocationTargetException
-import java.math.BigDecimal
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.charset.Charset
 import java.security.SecureRandom
 import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-
-fun Intent.hasTxn() = this.hasExtra(KeyTxn)
-fun Intent.getTxn() = this.getStringExtra(KeyTxn)
+fun Intent.getTxn() = getStringExtra(BadgeProvider.KeyTxn)
 fun String.padZero() = if (this.length % 2 == 0) this else "0$this"
 fun Double.toByteArray() = ByteBuffer.allocate(8).putDouble(this).array().reversed()
-const val KeyTxn = "Txn"
-const val KeyMtu = "Mtu"
 
 enum class HitconBadgeServices {
     Transaction,
@@ -60,6 +51,7 @@ enum class HitconBadgeServices {
     GeneralPurposeData
 }
 
+@Suppress("DEPRECATION")
 /**
  * Hitcon Badge Service Provider
  */
@@ -73,7 +65,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         const val MessageMtuFailure = 3
         const val MessageStopScanDevices = 4
         const val MessageStartScanGattService = 5
-
+        const val KeyTxn = "TXN"
         val serviceNames = arrayOf(
                 HitconBadgeServices.Transaction,
                 HitconBadgeServices.Txn,
@@ -88,7 +80,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     var scanning: Boolean = false
     val services: LinkedHashMap<HitconBadgeServices, BluetoothGattCharacteristic> = LinkedHashMap()
     var connected: Boolean = false
-
+    var serviceBound: Boolean = false
 
     private var scanDeviceCallback: BadgeScanCallback? = null
     private var scanDeviceCallback2: BadgeScanCallbackNew? = null
@@ -115,7 +107,6 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     }
 
     override fun handleMessage(msg: Message?) {
-        Log.d("Badge", "Receive message: ${msg?.what}")
         when (msg?.what) {
 
             MessageStopScanDevices -> {
@@ -126,11 +117,10 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             MessageReceiveTxn -> {
                 val bytes = msg.data.getByteArray(KeyTxn)
                 val txn = bytes.toHexString()
-                Log.e(TAG, "Tx Hex: $txn")
-                //val transaction = TransactionParcel(Transaction())
+                Log.d(TAG, "Tx Hex: $txn")
                 context.sendBroadcast(Intent().apply {
                     action = ActionReceiveTxn
-                    putExtra(KeyTransaction, txn)
+                    putExtra(KeyTxn, txn)
                 })
             }
             MessageGattConnectionChanged -> {
@@ -148,7 +138,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     interface BadgeCallback {
         fun onDeviceFound(device: BluetoothDevice)
         fun onTimeout()
-        fun onServiceDiscover()
+        fun onServiceDiscovered(bound: Boolean)
         fun onMtuChanged()
     }
 
@@ -165,12 +155,11 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
     private class BadgeScanCallback(val badgeProvider: BadgeProvider, val badgeCallback: BadgeCallback?) : BluetoothAdapter.LeScanCallback {
         override fun onLeScan(device: BluetoothDevice?, rssi: Int, scanRecord: ByteArray?) {
             Log.d(TAG, "onLeScan: ${device?.toString()}")
-            val uuids = parseUUIDList(scanRecord!!)
-            if (uuids.size > 0 && uuids.any { u -> u.toString() == badgeProvider.entity?.identify }) {
+            val arrayList = parseUUIDList(scanRecord!!)
+            if (arrayList.size > 0 && arrayList.any { u -> u.toString() == badgeProvider.entity?.identify }) {
                 badgeProvider.device = device
                 device?.let { badgeCallback?.onDeviceFound(it) }
                 badgeProvider.sendEmptyMessage(MessageStopScanDevices)
-//                badgeProvider.sendEmptyMessage(MessageStartScanGattService)
             }
         }
 
@@ -184,13 +173,14 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
 
                 val type = bytes[offset++].toInt()
                 when (type) {
-                    0x02, 0x03 ->
+                    0x02, 0x03 -> {
                         while (len > 1) {
                             var uuid16 = bytes[offset++].toInt()
                             uuid16 += bytes[offset++].toInt() shl 8
                             len -= 2
                             list.add(UUID.fromString(String.format("%08x-0000-1000-8000-00805f9b34fb", uuid16)))
                         }
+                    }
                     0x06, 0x07 ->
                         while (len >= 16) {
                             try {
@@ -219,17 +209,13 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
             Log.d(TAG, "onBadgeScanResult: ${result?.scanRecord?.toString()}")
-            val uuids = result?.scanRecord?.serviceUuids
-            val device = result?.device
-            uuids?.let {
+            result?.scanRecord?.serviceUuids?.let {
                 if (it.size > 0 && it.any { u -> u.toString() == badgeProvider.entity?.identify }) {
-                    badgeProvider.device = device
-                    device?.let { badgeCallback?.onDeviceFound(it) }
+                    badgeProvider.device = result.device
+                    result.device?.let { badgeCallback?.onDeviceFound(it) }
                     badgeProvider.sendEmptyMessage(MessageStopScanDevices)
-//                    badgeProvider.sendEmptyMessage(MessageStartScanGattService)
                 }
             }
-
         }
     }
 
@@ -262,10 +248,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                     Log.e(TAG, "mtu fail: $mtu")
                     val tmp = mtu / 2
                     if (tmp < 128)
-                        badgeProvider.sendMessage(Message().apply {
-                            what = MessageMtuFailure
-                            data = Bundle().apply { putInt(KeyMtu, mtu) }
-                        })
+                        badgeProvider.sendEmptyMessage(MessageMtuFailure)
                     else {
                         Log.e(TAG, "reset mtu to $tmp")
                         gatt?.requestMtu(tmp)
@@ -284,17 +267,18 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                     if (service.uuid.toString() == badgeProvider.entity?.identify) {
                         for (ch in service.characteristics) {
                             Log.d(TAG, "matching characteristic: ${ch.uuid}")
-                            var name = badgeProvider.entity?.getUuidName(ch.uuid)
+                            val name = badgeProvider.entity?.getUuidName(ch.uuid)
                             if (name != null) {
-                                Log.d(TAG, "find! ${name.name}")
+                                Log.d(TAG, "Binding!")
                                 badgeProvider.services[name] = ch
                             }
                         }
+                        badgeProvider.serviceBound = badgeProvider.services.size > 0
                     }
                 }
-                badgeCallback?.onServiceDiscover()
+                badgeCallback?.onServiceDiscovered(badgeProvider.serviceBound)
                 Log.d(TAG, "start change mtu: ${badgeProvider.mtu}")
-                gatt?.requestMtu(badgeProvider.mtu)
+                gatt.requestMtu(badgeProvider.mtu)
             }
         }
 
@@ -355,7 +339,16 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         if (gatt == null) {
             Log.d(TAG, "no gatt instance, connect create")
             gattScanCallback = GattScanCallback(this, leScanCallback)
-            gatt = device?.connectGatt(context, false, gattScanCallback)
+            serviceBound = false
+            gatt = device.connectGatt(context, false, gattScanCallback)
+
+            postDelayed({
+                if (!serviceBound) {
+                    gatt?.disconnect()
+                    leScanCallback?.onTimeout()
+                }
+
+            }, 15000)
         } else {
             Log.d(TAG, "gatt instance exist, reconnect")
         }
@@ -393,40 +386,36 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         }
     }
 
-    fun refreshGatt(gatt: BluetoothGatt) {
-        if (gatt != null) {
-            //add_info("Connected!\n");
-            try {
-                val method = gatt.javaClass.getMethod("refresh")
-                method?.invoke(gatt)
-            } catch (e: NoSuchMethodException) {
-                e.printStackTrace()
-            } catch (e: IllegalAccessException) {
-                e.printStackTrace()
-            } catch (e: InvocationTargetException) {
-                e.printStackTrace()
-            }
-
+    private fun refreshGatt(gatt: BluetoothGatt) {
+        //add_info("Connected!\n");
+        try {
+            val method = gatt.javaClass.getMethod("refresh")
+            method?.invoke(gatt)
+        } catch (e: NoSuchMethodException) {
+            e.printStackTrace()
+        } catch (e: IllegalAccessException) {
+            e.printStackTrace()
+        } catch (e: InvocationTargetException) {
+            e.printStackTrace()
         }
     }
 
 
     fun startTransaction(transaction: org.kethereum.model.Transaction) {
         Log.i(TAG, "start transaction")
-        this.transaction = transaction
         val haddress = transaction.to.toString().clean0xPrefix()
         val hvalue = transaction.value.toHexString().clean0xPrefix().padZero()
         val hgaslimit = transaction.gasLimit.toHexString().clean0xPrefix().padZero()
         val hgas = transaction.gasPrice.toHexString().clean0xPrefix().padZero()
         val hnoice = transaction.nonce!!.toHexString().clean0xPrefix().padZero()
         val hdata = transaction.input.toHexString("")
-        var transArray =
+        val transArray =
                 "01" + String.format("%02X", haddress.length / 2) + haddress +
                         "02" + String.format("%02X", hvalue.length / 2) + hvalue +
                         "03" + String.format("%02X", hgas.length / 2) + hgas +
                         "04" + String.format("%02X", hgaslimit.length / 2) + hgaslimit +
-                        "05" + String.format("%02X", hnoice!!.length / 2) + hnoice +
-                        "06" + String.format("%02X", hdata!!.length / 2) + hdata
+                        "05" + String.format("%02X", hnoice.length / 2) + hnoice +
+                        "06" + String.format("%02X", hdata.length / 2) + hdata
         Log.d(TAG, "01(haddress): $haddress")
         Log.d(TAG, "02(hvalue): $hvalue")
         Log.d(TAG, "03(hgas): $hgas")
@@ -435,9 +424,9 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         Log.d(TAG, "06(hdata): $hdata")
         Log.d(TAG, "transArray: $transArray")
         SecureRandom().nextBytes(txIV)
-        val aeskey = entity!!.key!!.hexToByteArray()
-        val ptext = transArray.hexToByteArray()
-        val enc = (txIV.toHexString("") + encrypt(txIV, aeskey!!, ptext).toHexString("")).hexToByteArray()
+        val key = entity!!.key!!.hexToByteArray()
+        val text = transArray.hexToByteArray()
+        val enc = (txIV.toHexString("") + encrypt(txIV, key, text).toHexString("")).hexToByteArray()
         Log.d(TAG, "enc(transArray): ${enc.toHexString()}")
         val cha = services[HitconBadgeServices.Transaction]
         cha?.value = enc
@@ -455,7 +444,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         if (entity == null || !connected || transacting) return
         Log.i(TAG, "start update balance, eth raw: '$ethBalance', hitcon raw: '$hitconBalance'")
 
-        var transArray: String = ""
+        var transArray = ""
         if (ethBalance != null) {
             val haddress = entity!!.address!!
             val balanceValue = ethBalance.toBigDecimal().scaleByPowerOfTen(-18).toDouble()
@@ -474,73 +463,32 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
             transArray += trans
         }
 
-        if(transArray.isNotEmpty()) {
+        if (transArray.isNotEmpty()) {
             Log.d(TAG, "raw transArray is $transArray, start update")
             SecureRandom().nextBytes(ethIV)
-            val aeskey = entity!!.key!!.hexToByteArray()
-            val ptext = transArray.hexToByteArray()
-            val enc = (ethIV.toHex() + encrypt(ethIV, aeskey!!, ptext).toHex()).hexToByteArray()
+            val key = entity!!.key!!.hexToByteArray()
+            val text = transArray.hexToByteArray()
+            val enc = (ethIV.toHex() + encrypt(ethIV, key, text).toHex()).hexToByteArray()
             val cha = services[HitconBadgeServices.Balance]
             cha?.value = enc
             cha?.let { gatt?.writeCharacteristic(it) }
-        }
-        else
+        } else
             Log.d(TAG, "no data need update, do nothing")
         Log.i(TAG, "finish update balance")
     }
-
-    fun startUpdateBalance(balance: String) {
-        if (entity == null || !connected || transacting) return
-        Log.i(TAG, "start update eth balance, raw: '$balance'")
-        val haddress = entity!!.address!!
-        val balanceValue = balance.toBigDecimal().scaleByPowerOfTen(-18).toDouble()
-        val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
-        var transArray =
-                "01" + String.format("%02X", haddress.length / 2) + haddress +
-                        "02" + String.format("%02X", hvalue.length / 2) + hvalue
-
-        SecureRandom().nextBytes(ethIV)
-        val aeskey = entity!!.key!!.hexToByteArray()
-        val ptext = transArray.hexToByteArray()
-        val enc = (ethIV.toHex() + encrypt(ethIV, aeskey!!, ptext).toHex()).hexToByteArray()
-        val cha = services[HitconBadgeServices.Balance]
-        cha?.value = enc
-        cha?.let { gatt?.writeCharacteristic(it) }
-    }
-
-    fun startUpdateBalance(token: Token, balance: String) {
-        if (entity == null || !connected || transacting) return
-        Log.i(TAG, "start update token '${token.name}' balance, raw: '$balance'")
-        val haddress = token.address.cleanHex
-        val balanceValue = balance.toBigDecimal().scaleByPowerOfTen(-token.decimals).toDouble()
-        //val balanceValue = 100.0
-        val hvalue = balanceValue.toByteArray().toHexString().clean0xPrefix()
-        var transArray =
-                "01" + String.format("%02X", haddress.length / 2) + haddress +
-                        "02" + String.format("%02X", hvalue.length / 2) + hvalue
-
-        SecureRandom().nextBytes(baIV)
-        val aeskey = entity!!.key!!.hexToByteArray()
-        val ptext = transArray.hexToByteArray()
-        val enc = (baIV.toHex() + encrypt(baIV, aeskey!!, ptext).toHex()).hexToByteArray()
-        val cha = services[HitconBadgeServices.Balance]
-        cha?.value = enc
-        cha?.let { gatt?.writeCharacteristic(it) }
-    }
-
-
-    private fun BigDecimal.toHex(): String {
-        var result = String.format("%X", this.toBigInteger())
-        if (result.length % 2 == 1)
-            result = "0$result"
-        return result
-    }
-
 
     fun initializeBadge(init: InitializeContent, leScanCallback: BadgeCallback? = null) {
         entity = BadgeEntity(init.service, null, init.address, key = init.key, services = getServiceEntityList(init))
         saveEntity()
         startScanDevice(leScanCallback)
+    }
+
+    fun disconnectBadge() {
+        if (connected) {
+            gatt?.disconnect()
+        }
+        gatt = null
+
     }
 
 

@@ -144,9 +144,6 @@ class CreateAccountActivity : AppCompatActivity() {
                     var code = stringExtra.toHitconQrCode()
                     if (code.valid) {
                         startBadgeActivityForInitialize(this@CreateAccountActivity, code)
-//                        startActivityForResult(Intent(this@CreateAccountActivity, HitconBadgeActivity::class.java).apply {
-//                            putExtra(org.hitcon.activities.KeyHitconQrCode, intent.getHitconQrCode())
-//                        }, REQUEST_CODE_BADGE)
                     }
 
                 } else {

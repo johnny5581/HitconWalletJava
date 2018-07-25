@@ -31,10 +31,7 @@ open class AddressBookActivity : BaseAddressBookActivity() {
     }
 
     override fun onFabClick() {
-        var i = Intent(baseContext, CreateAccountActivity::class.java)
-        if (intent.hasHitconQrCode())
-            i.putExtra(KeyHitconQrCode, intent.getHitconQrCode())
-        startActivity(i)
+        startBadgeActivityForInitialize(this, intent.getHitconQrCode())
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

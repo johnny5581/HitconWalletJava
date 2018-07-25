@@ -1,5 +1,6 @@
 <resources>
-    <string name="app_name">WallΞTH</string>
+    <!--<string name="app_name">WallΞTH</string>-->
+    <string name="app_name">HITCON Walleth</string>
     <string name="welcome">Welcome,\n\n there was no account for you yet - so one was created. Note - this one is not secured with any password for easy use - so only use it as a hot walleth for a few beverages. Also be aware that this alpha operates currently on the rinkeby network only.</string>
     <string name="request_transaction_subtitle">Request Transaction</string>
     <string name="edit_account_subtitle">Edit Account</string>
@@ -8,7 +9,7 @@
     <string name="transaction_subtitle">Transaction details</string>
 
     <string name="scan_instructions">Center a QR code inside the frame.</string>
-    <string name="no_camera_permission">WallΞTH does not have permission to access the camera.</string>
+    <string name="no_camera_permission">HITCON Walleth does not have permission to access the camera.</string>
 
     <string name="request_subtitle">Request</string>
     <string name="drawer_open">open</string>
@@ -91,7 +92,7 @@ Unfortunately there is no faucet for the test-net. So if you want to try out thi
     <string name="copy">Copy</string>
     <string name="share">Share</string>
     <string name="print">Print</string>
-    <string name="paper_wallet_title">WallΞTH Paper Ethereum Wallet</string>
+    <string name="paper_wallet_title">HITCON Walleth Paper Ethereum Wallet</string>
     <string name="paper_wallet_text">This is the private key for your Ethereum account - store it safely and remember the corresponding password.</string>
     <string name="imported_key_alert_message">Imported %s</string>
     <string name="imported_key_default_entry_name">Imported</string>
@@ -142,7 +143,7 @@ Unfortunately there is no faucet for the test-net. So if you want to try out thi
     <string name="create_tx_error_invalid_erc67_title">Invalid ERC67</string>
     <string name="create_tx_error_invalid_address">%s is not a valid Ethereum-Address</string>
     <string name="default_account_name">Default Account</string>
-    <string name="new_address_note">This Account was created for you when WALLΞTH started for the first time</string>
+    <string name="new_address_note">This Account was created for you when HITCON Walleth started for the first time</string>
     <string name="request_funds_add_value">Add Value</string>
     <string name="request_funds_value_hint">Value</string>
     <string name="trezor_custom_derivation_path">Custom</string>
@@ -229,5 +230,16 @@ Unfortunately there is no faucet for the test-net. So if you want to try out thi
     <string name="trezor_not_initialized">TREZOR not initialized. Please use the TREZOR manager to initialize.</string>
     <string name="process_error">Process Error %s</string>
     <!--hitcon badge -->
-    <string name="badge_title">Hitcon Badge</string>
+    <string name="badge_title">HITCON Badge</string>
+    <string name="message_need_init">This feature need to initialize.</string>
+    <string name="message_connecting_device">Connecting badge…</string>
+    <string name="message_connecting_gatt">Connecting bluetooth services…</string>
+    <string name="message_connect_timeout">Timeout :(</string>
+    <string name="message_connected">Badge connected</string>
+    <string name="message_waiting_transaction">Waiting for transaction…</string>
+    <string name="message_permission_bluetooth">This app need bluetooth enable</string>
+    <string name="message_transaction_finish">Transfer created, waiting for result</string>
+    <string name="message_current_address_is_badge">Current wallet account is HITCON badge. Do you want to connect to badge now?</string>
+    <string name="message_need_permission">This app need Locale Permission</string>
+    <string name="message_transfer_cancel">Cancel transaction</string>
 </resources>

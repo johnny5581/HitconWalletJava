@@ -7,6 +7,7 @@ import android.arch.lifecycle.Transformations
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
 import android.view.MenuItem
@@ -21,8 +22,8 @@ import kotlinx.android.synthetic.main.value.*
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
-import org.hitcon.activities.HitconBadgeActivity
-import org.hitcon.activities.getTransaction
+import org.hitcon.activities.*
+import org.hitcon.activities.HitconBadgeActivity.Companion.REQUEST_BADGE_TRANSFER
 import org.kethereum.contract.abi.types.convertStringToABIType
 import org.kethereum.erc681.ERC681
 import org.kethereum.erc681.generateURL
@@ -90,7 +91,7 @@ class CreateTransactionActivity : AppCompatActivity() {
     private var currentBalance: Balance? = null
     private var lastWarningURI: String? = null
     private var currentBalanceLive: LiveData<Balance>? = null
-
+    private val handler = Handler()
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         when (requestCode) {
             TREZOR_REQUEST_CODE -> {
@@ -109,22 +110,28 @@ class CreateTransactionActivity : AppCompatActivity() {
                 setAmountFromETHString(amount_input.text.toString())
                 onCurrentTokenChanged()
             }
-            6522 ->
-                if (resultCode == Activity.RESULT_OK) {
-                    async(UI) {
-                        storeDefaultGasPrice()
-                    }
-                    AlertDialog.Builder(this).setMessage("Transaction finish, when pending done, the transaction will display on list")
-                            .setPositiveButton("OK") { _, _ ->
-                                finish()
-                            }.create().show()
-                } else {
-                    var message = data!!.getStringExtra("error")
-                    AlertDialog.Builder(this).setMessage(message)
-                            .setPositiveButton("OK") { _, _ ->
-                                finish()
-                            }.create().show()
-                }
+//            6522 ->
+//                if (resultCode == Activity.RESULT_OK) {
+//                    async(UI) {
+//                        storeDefaultGasPrice()
+//                    }
+//                    AlertDialog.Builder(this).setMessage(getString(R.string.message_transaction_finish))
+//                            .setCancelable(false)
+//                            .setPositiveButton(android.R.string.ok) { _, _ ->
+//                                handler.post { this@CreateTransactionActivity.finish() }
+//                            }.create().show()
+//                } else if (data?.hasError() == true) {
+//                    val message = data?.getError()
+//                    AlertDialog.Builder(this).setMessage(message)
+//                            .setCancelable(false)
+//                            .setPositiveButton(android.R.string.ok) { _, _ ->
+//                                finish()
+//                            }.create().show()
+//                }
+            REQUEST_BADGE_TRANSFER -> {
+                storeDefaultGasPrice()
+            }
+
 
             else -> data?.let {
                 if (data.hasExtra("HEX")) {
@@ -329,9 +336,7 @@ class CreateTransactionActivity : AppCompatActivity() {
         when {
 
             isTrezorTransaction -> startTrezorActivity(TransactionParcel(transaction))
-            isBadgeTransaction -> startActivityForResult(Intent(this, HitconBadgeActivity::class.java).apply {
-                putExtra("TX", TransactionParcel(transaction))
-            }, 6522)
+            isBadgeTransaction -> startBadgeActivityForTransfer(this, TransactionParcel(transaction))
             else -> async(UI) {
                 async(CommonPool) {
                     appDatabase.transactions.upsert(transaction.toEntity(signatureData = null, transactionState = TransactionState()))
