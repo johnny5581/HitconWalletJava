@@ -222,7 +222,7 @@ class EtherScanService : LifecycleService() {
                 var update = false
 
                 if (ethBalanceString != null) {
-                    if(lastEthBalance != ethBalanceString)
+                    if(lastEthBalance != ethBalanceString && badgeProvider.connected)
                         update = true
                     lastEthBalance = ethBalanceString
                     try {
@@ -241,7 +241,7 @@ class EtherScanService : LifecycleService() {
                 }
                 if (balanceString != null) {
 
-                    if(lastErcBalance != balanceString)
+                    if(lastErcBalance != balanceString && badgeProvider.connected)
                         update = true
                     lastErcBalance = balanceString
                     try {

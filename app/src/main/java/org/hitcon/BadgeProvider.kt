@@ -347,10 +347,18 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                     gatt?.disconnect()
                     leScanCallback?.onTimeout()
                 }
-
             }, 15000)
         } else {
             Log.d(TAG, "gatt instance exist, reconnect")
+            gatt?.disconnect()
+            serviceBound = false
+            gatt?.connect()
+            postDelayed({
+                if (!serviceBound) {
+                    gatt?.disconnect()
+                    leScanCallback?.onTimeout()
+                }
+            }, 15000)
         }
         //gatt?.disconnect()
         //gatt?.connect()
