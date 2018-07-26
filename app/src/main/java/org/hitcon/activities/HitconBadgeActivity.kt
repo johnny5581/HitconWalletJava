@@ -27,6 +27,7 @@ import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.hitcon.BadgeProvider
+import org.hitcon.data.getEtherscanApi
 import org.hitcon.data.qrcode.HitconQrCode
 import org.hitcon.data.qrcode.InitializeContent
 import org.hitcon.getTxn
@@ -198,13 +199,14 @@ class HitconBadgeActivity : AppCompatActivity() {
 //                            }
 //                            .create().show()
                     async(UI) {
-                        async(CommonPool) {
-                            val res = activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
-                            if(res != null && !res.has("error"))
-                                activity.setResult(Activity.RESULT_OK)
+                        val res = async(CommonPool) {
+                           activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
                         }.await()
+                        if(res != null && !res.has("error"))
+                            activity.setResult(Activity.RESULT_OK)
+                        activity.finish()
                     }
-                    activity.finish()
+
                 } else {
                     AlertDialog.Builder(activity)
                             .setCancelable(false)
@@ -232,7 +234,8 @@ class HitconBadgeActivity : AppCompatActivity() {
             val baseURL = networkDefinition.getBlockExplorer().baseAPIURL.letIf(httpFallback) {
                 replace("https://", "http://") // :-( https://github.com/walleth/walleth/issues/134 )
             }
-            val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
+            //val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
+            val urlString = "$baseURL/api?$requestString&apikey=$" + getEtherscanApi()
             val url = Request.Builder().url(urlString).build()
             val newCall: Call = okHttpClient.newCall(url)
 

@@ -44,9 +44,10 @@ fun parseEtherScanTransactions(jsonArray: JSONArray, chain: ChainDefinition): Pa
         )
         if(trans.transaction.isTokenTransfer())
         {
-            //set to and from with trans
+            //set to and value with trans
             trans.ercTo = trans.transaction.getTokenTransferTo()
             trans.ercValue = trans.transaction.getTokenTransferValue().toString()
+            trans.ercContract = Address(transactionJson.getString("contractAddress"))
         }
         trans
 

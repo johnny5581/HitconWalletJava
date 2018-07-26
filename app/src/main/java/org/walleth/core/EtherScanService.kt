@@ -11,6 +11,7 @@ import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.hitcon.BadgeProvider
+import org.hitcon.data.getEtherscanApi
 import org.json.JSONException
 import org.json.JSONObject
 import org.kethereum.functions.encodeRLP
@@ -24,10 +25,7 @@ import org.walleth.data.balances.upsertIfNewerBlock
 import org.walleth.data.networks.CurrentAddressProvider
 import org.walleth.data.networks.NetworkDefinition
 import org.walleth.data.networks.NetworkDefinitionProvider
-import org.walleth.data.tokens.CurrentTokenProvider
-import org.walleth.data.tokens.getEthTokenForChain
-import org.walleth.data.tokens.isETH
-import org.walleth.data.tokens.isHITCON
+import org.walleth.data.tokens.*
 import org.walleth.data.transactions.TransactionEntity
 import org.walleth.data.transactions.setHash
 import org.walleth.khex.toHexString
@@ -53,9 +51,9 @@ class EtherScanService : LifecycleService() {
         private var shortcut = false
 
         private var lastSeenTransactionsBlock = 0L
-        private var lastSeenBalanceBlock = 0L
         private var lastTokenSeenTransactionsBlock = 0L
-        private var lastTokenSeenBalanceBlock = 0L
+        private var lastSeenBalanceBlock = 0L
+
 
     }
 
@@ -164,7 +162,7 @@ class EtherScanService : LifecycleService() {
     private fun queryTransactions(addressHex: String) {
         networkDefinitionProvider.value?.let { currentNetwork ->
             val requestString = "module=account&action=txlist&address=$addressHex&startblock=$lastSeenTransactionsBlock&endblock=${lastSeenBalanceBlock + 1L}&sort=asc"
-            val tokenRequestString = "module=account&action=tokentx&address=$addressHex&startblock=$lastTokenSeenTransactionsBlock&endblock=${lastTokenSeenBalanceBlock + 1L}&sort=asc"
+            val tokenRequestString = "module=account&action=tokentx&address=$addressHex&contractaddress=${getHitconTokenForChain(currentNetwork).address}&startblock=$lastTokenSeenTransactionsBlock&endblock=${lastSeenBalanceBlock + 1L}&sort=asc"
             try {
                 val etherscanResult = getEtherscanResult(requestString, currentNetwork)
                 val tokenEtherscanResult = getEtherscanResult(tokenRequestString, currentNetwork)
@@ -215,13 +213,11 @@ class EtherScanService : LifecycleService() {
                 return
             }
             val blockNum = etherscanResult.getString("result")?.replace("0x", "")?.toLongOrNull(16)
-
             if (blockNum != null) {
                 lastSeenBalanceBlock = blockNum
 
-
                 val ethBalanceString = getEtherscanResult("module=account&action=balance&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
-                val balanceString = if (!currentToken.isETH()) getEtherscanResult("module=account&action=tokenbalance&contractaddress=${currentToken.address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result") else null
+                val balanceString = getEtherscanResult("module=account&action=tokenbalance&contractaddress=${getHitconTokenForChain(currentNetwork).address}&address=$addressHex&tag=latest", currentNetwork)?.getString("result")
 
                 var update = false
 
@@ -244,6 +240,7 @@ class EtherScanService : LifecycleService() {
                     }
                 }
                 if (balanceString != null) {
+
                     if(lastErcBalance != balanceString)
                         update = true
                     lastErcBalance = balanceString
@@ -286,7 +283,7 @@ class EtherScanService : LifecycleService() {
         val baseURL = networkDefinition.getBlockExplorer().baseAPIURL.letIf(httpFallback) {
             replace("https://", "http://") // :-( https://github.com/walleth/walleth/issues/134 )
         }
-        val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
+        val urlString = "$baseURL/api?$requestString&apikey=$" + /*BuildConfig.ETHERSCAN_APIKEY*/ getEtherscanApi()
         val url = Request.Builder().url(urlString).build()
         val newCall: Call = okHttpClient.newCall(url)
 

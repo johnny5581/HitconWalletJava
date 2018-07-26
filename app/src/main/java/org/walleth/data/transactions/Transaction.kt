@@ -30,5 +30,6 @@ data class TransactionEntity(
 
         var hexData: String? = null,
         var ercTo: Address? = null,
-        var ercValue: String? = null
+        var ercValue: String? = null,
+        var ercContract: Address? = null
 )

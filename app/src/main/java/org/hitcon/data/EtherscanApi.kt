@@ -1,0 +1,17 @@
+package org.hitcon.data
+
+import java.util.concurrent.ThreadLocalRandom
+
+val etherscanApis = arrayOf(
+        "EZ9SRW458YSBPZWEXRF1Q35NWZY5UXZQ41",
+        "R6HQ6DGNKEYUGJAR4R436CUKVRVYABY37N",
+        "96YIYNNJDKFXMI2DI16ZDWEZEMHH792IS3",
+        "97XM5ASTHEI9R51UYJA19ANJPFF8QEE2CW",
+        "5E1RVYJB26DJKWJ584GYRJP9A7UA2PP12Y",
+        "ITMVEEAZV2PBC7B7AK4HAYIDYQUI33ZHVW",
+        "PTV1BXQMS6XW5XGZYR3XV2FMTKNQF5SBMX",
+        "DYR1N3F6DU5TRVSGSAXIUEKVGB54RGMQH4",
+        "AFW8K49CZDIC8MH2ZSMZ9YCWJBYCEX7FBN"
+)
+
+fun getEtherscanApi() = etherscanApis.get(ThreadLocalRandom.current().nextInt(etherscanApis.size))

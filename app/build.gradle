@@ -27,7 +27,7 @@ android {
         testInstrumentationRunner "org.walleth.infrastructure.AppReplacingRunner"
         vectorDrawables.useSupportLibrary = true
 
-        buildConfigField "String", "ETHERSCAN_APIKEY", '"' + file('../.ci/etherscan.apikey').text + '"'
+        //buildConfigField "String", "ETHERSCAN_APIKEY", '"' + file('../.ci/etherscan.apikey').text + '"'
 
         multiDexEnabled true
 
