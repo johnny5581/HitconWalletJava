@@ -129,7 +129,19 @@ class CreateTransactionActivity : AppCompatActivity() {
 //                            }.create().show()
 //                }
             REQUEST_BADGE_TRANSFER -> {
-                storeDefaultGasPrice()
+                if(resultCode == Activity.RESULT_OK) {
+                    AlertDialog.Builder(this)
+                            .setCancelable(false)
+                            .setTitle(R.string.badge_title)
+                            .setMessage(R.string.message_transaction_finish)
+                            .setPositiveButton(android.R.string.ok) { dialog, _ ->
+                                dialog.dismiss()
+                                storeDefaultGasPrice()
+                            }
+                            .create().show()
+
+                    //storeDefaultGasPrice()
+                }
             }
 
 

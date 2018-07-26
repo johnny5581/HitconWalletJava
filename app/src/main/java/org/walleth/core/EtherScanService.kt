@@ -45,7 +45,8 @@ class EtherScanService : LifecycleService() {
     private val tokenProvider: CurrentTokenProvider by lazyKodein.instance()
     private val appDatabase: AppDatabase by lazyKodein.instance()
     private val networkDefinitionProvider: NetworkDefinitionProvider by lazyKodein.instance()
-
+    private var lastEthBalance: String? = null
+    private var lastErcBalance: String? = null
     companion object {
         private var timing = 7_000 // in MilliSeconds
         private var last_run = 0L
@@ -55,8 +56,7 @@ class EtherScanService : LifecycleService() {
         private var lastSeenBalanceBlock = 0L
         private var lastTokenSeenTransactionsBlock = 0L
         private var lastTokenSeenBalanceBlock = 0L
-        private var lastEthBalance: String = ""
-        private var lastErcBalance: String = ""
+
     }
 
     class TimingModifyingLifecycleObserver : LifecycleObserver {
@@ -112,8 +112,14 @@ class EtherScanService : LifecycleService() {
     }
 
     private fun relayTransactionsIfNeeded() {
-        appDatabase.transactions.getAllToRelayLive().observe(this, Observer {
-            it?.let { it.filter { (it.signatureData != null || it.hexData != null) && !it.transactionState.relayedEtherscan }.forEach { relayTransaction(it) } }
+        appDatabase.transactions.getAllToRelayLive().observe(this, Observer { list->
+            list?.let {
+                it.filter {
+                    (it.signatureData != null || it.hexData != null) && !it.transactionState.relayedEtherscan
+                }.forEach {
+                    relayTransaction(it)
+                }
+            }
         })
     }
 
@@ -220,7 +226,7 @@ class EtherScanService : LifecycleService() {
                 var update = false
 
                 if (ethBalanceString != null) {
-                    if(lastErcBalance != ethBalanceString)
+                    if(lastEthBalance != ethBalanceString)
                         update = true
                     lastEthBalance = ethBalanceString
                     try {
@@ -238,9 +244,9 @@ class EtherScanService : LifecycleService() {
                     }
                 }
                 if (balanceString != null) {
-                    if(lastEthBalance != balanceString)
+                    if(lastErcBalance != balanceString)
                         update = true
-                    lastEthBalance = balanceString
+                    lastErcBalance = balanceString
                     try {
                         appDatabase.balances.upsertIfNewerBlock(
                                 Balance(address = Address(addressHex),

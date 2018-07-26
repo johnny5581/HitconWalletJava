@@ -1,6 +1,9 @@
 package org.walleth.core
 
 import org.json.JSONArray
+import org.kethereum.functions.getTokenTransferTo
+import org.kethereum.functions.getTokenTransferValue
+import org.kethereum.functions.isTokenTransfer
 import org.kethereum.model.Address
 import org.kethereum.model.ChainDefinition
 import org.kethereum.model.createTransactionWithDefaults
@@ -20,7 +23,7 @@ fun parseEtherScanTransactions(jsonArray: JSONArray, chain: ChainDefinition): Pa
         val timeStamp = transactionJson.getString("timeStamp").toLong()
         val blockNumber = transactionJson.getString("blockNumber").toLong()
         lastBlockNumber = Math.max(blockNumber, lastBlockNumber)
-        TransactionEntity(
+        val trans = TransactionEntity(
                 transactionJson.getString("hash"),
                 createTransactionWithDefaults(
                         chain = chain,
@@ -39,6 +42,14 @@ fun parseEtherScanTransactions(jsonArray: JSONArray, chain: ChainDefinition): Pa
                 signatureData = null,
                 transactionState = TransactionState(false, isPending = false, source = TransactionSource.ETHERSCAN)
         )
+        if(trans.transaction.isTokenTransfer())
+        {
+            //set to and from with trans
+            trans.ercTo = trans.transaction.getTokenTransferTo()
+            trans.ercValue = trans.transaction.getTokenTransferValue().toString()
+        }
+        trans
+
     }
     return ParseResult(list, lastBlockNumber)
 }

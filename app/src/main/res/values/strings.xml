@@ -242,4 +242,7 @@ Unfortunately there is no faucet for the test-net. So if you want to try out thi
     <string name="message_current_address_is_badge">Current wallet account is HITCON badge. Do you want to connect to badge now?</string>
     <string name="message_need_permission">This app need Locale Permission</string>
     <string name="message_transfer_cancel">Cancel transaction</string>
+    <string name="message_service_not_bound">Bluetooth doesn\'t found any matching service on this badge, please re-open the bluetooth adapter manual to clean the cache.</string>
+    <string name="name_badge">HITCON Badge</string>
+    <string name="desc_badge">HITCON hardware badge wallet</string>
 </resources>

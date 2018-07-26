@@ -171,34 +171,46 @@ class HitconBadgeActivity : AppCompatActivity() {
             val txn = intent?.getTxn()
             txn?.let {
                 if (it.length > 4) {
-                    activity.transaction?.let { transaction ->
-                        async(UI) {
-                            async(CommonPool) {
-                                activity.appDatabase.transactions.upsert(transaction.toEntity(null, TransactionState()))
-                            }.await()
-                        }
-                    }
-                    AlertDialog.Builder(activity)
-                            .setMessage("send?")
-                            .setPositiveButton(android.R.string.ok) {dialog, _ ->
-                                dialog.dismiss()
-                                async(UI) {
-                                    async(CommonPool) {
-                                        activity.getEtherscanResult(it, activity.networkProvider.getCurrent())
-                                    }.await()
-                                }
-                                activity.setResult(Activity.RESULT_OK)
-                                activity.finish()
-                            }.create().show()
 
-//                    activity.setResult(Activity.RESULT_OK)
-//                    activity.finish()
+//                    AlertDialog.Builder(activity)
+//                            .setMessage("send or save?")
+//                            .setPositiveButton(android.R.string.ok) { dialog, _ ->
+//                                dialog.dismiss()
+//                                async(UI) {
+//                                    async(CommonPool) {
+//                                        activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
+//                                    }.await()
+//                                }
+//                                activity.setResult(Activity.RESULT_OK)
+//                                activity.finish()
+//                            }
+//                            .setNegativeButton(android.R.string.cancel) { dialog, _ ->
+//                                dialog.dismiss()
+//                                activity.transaction?.let { transaction ->
+//                                    async(UI) {
+//                                        async(CommonPool) {
+//                                            activity.appDatabase.transactions.upsert(transaction.toEntity(null, TransactionState(isPending = false, needsSigningConfirmation = false)))
+//                                        }.await()
+//                                    }
+//                                }
+//                                activity.setResult(Activity.RESULT_OK)
+//                                activity.finish()
+//                            }
+//                            .create().show()
+                    async(UI) {
+                        async(CommonPool) {
+                            val res = activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
+                            if(res != null && !res.has("error"))
+                                activity.setResult(Activity.RESULT_OK)
+                        }.await()
+                    }
+                    activity.finish()
                 } else {
                     AlertDialog.Builder(activity)
                             .setCancelable(false)
                             .setTitle(R.string.badge_title)
                             .setMessage(R.string.message_transfer_cancel)
-                            .setPositiveButton(android.R.string.ok) {dialog,_ ->
+                            .setPositiveButton(android.R.string.ok) { dialog, _ ->
                                 dialog.dismiss()
                                 activity.setResult(Activity.RESULT_OK)
                                 activity.finish()
@@ -216,14 +228,15 @@ class HitconBadgeActivity : AppCompatActivity() {
     }
 
     private fun getEtherscanResult(requestString: String, networkDefinition: NetworkDefinition, httpFallback: Boolean): JSONObject? {
-        val baseURL = networkDefinition.getBlockExplorer().baseAPIURL.letIf(httpFallback) {
-            replace("https://", "http://") // :-( https://github.com/walleth/walleth/issues/134 )
-        }
-        val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
-        val url = Request.Builder().url(urlString).build()
-        val newCall: Call = okHttpClient.newCall(url)
-
         try {
+            val baseURL = networkDefinition.getBlockExplorer().baseAPIURL.letIf(httpFallback) {
+                replace("https://", "http://") // :-( https://github.com/walleth/walleth/issues/134 )
+            }
+            val urlString = "$baseURL/api?$requestString&apikey=$" + BuildConfig.ETHERSCAN_APIKEY
+            val url = Request.Builder().url(urlString).build()
+            val newCall: Call = okHttpClient.newCall(url)
+
+
             val resultString = newCall.execute().body().use { it?.string() }
             resultString.let {
                 return JSONObject(it)

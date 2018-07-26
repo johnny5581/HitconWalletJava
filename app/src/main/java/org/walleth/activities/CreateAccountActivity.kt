@@ -1,6 +1,7 @@
 package org.walleth.activities
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -13,6 +14,7 @@ import kotlinx.android.synthetic.main.activity_account_create.*
 import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
+import org.hitcon.BadgeProvider
 import org.hitcon.activities.*
 import org.hitcon.data.qrcode.isHitconQrCodeUri
 import org.hitcon.data.qrcode.toHitconQrCode
@@ -163,12 +165,21 @@ class CreateAccountActivity : AppCompatActivity() {
                 trezorPath = getPATHResult()
                 setAddressFromExternalApplyingChecksum(getAddressResult())
             } else if (hasBadgeAddress()) {
-                isBadge = true
-                setAddressFromExternalApplyingChecksum(getBadgeAddress())
-                if(nameInput.text.isBlank())
-                    nameInput.setText("Hitcon Badge")
-                if(noteInput.text.isBlank())
-                    noteInput.setText("Hitcon hardware badge wallet")
+                if(resultCode == Activity.RESULT_OK) {
+                    isBadge = true
+                    setAddressFromExternalApplyingChecksum(getBadgeAddress())
+                    if (nameInput.text.isBlank())
+                        nameInput.setText(getString(R.string.name_badge))
+                    if (noteInput.text.isBlank())
+                        noteInput.setText(getString(R.string.desc_badge))
+                }
+                else {
+                    AlertDialog.Builder(this@CreateAccountActivity)
+                            .setTitle(R.string.badge_title)
+                            .setMessage(R.string.message_service_not_bound)
+                            .setCancelable(false)
+                            .create().show()
+                }
             }
         }
     }
