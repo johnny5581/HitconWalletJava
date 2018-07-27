@@ -8,6 +8,12 @@
         app:showAsAction="ifRoom"
         />
     <item
+        android:id="@+id/menu_sync"
+        android:icon="@drawable/ic_sync_black_24dp"
+        android:title="@string/sync"
+        app:showAsAction="ifRoom"
+        />
+    <item
         android:id="@+id/menu_info"
         android:icon="@drawable/ic_action_info_outline"
         android:title="@string/info"

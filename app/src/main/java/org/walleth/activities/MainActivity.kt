@@ -1,5 +1,6 @@
 package org.walleth.activities
 
+import android.app.ProgressDialog
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.Observer
 import android.bluetooth.BluetoothAdapter
@@ -18,12 +19,16 @@ import android.support.v7.widget.LinearLayoutManager
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View.INVISIBLE
+import android.widget.Toast
 import com.github.salomonbrys.kodein.LazyKodein
 import com.github.salomonbrys.kodein.android.appKodein
 import com.github.salomonbrys.kodein.instance
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main_in_drawer_container.*
 import kotlinx.android.synthetic.main.value.*
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.async
 import org.hitcon.BadgeProvider
 import org.hitcon.activities.startBadgeActivityForConnection
 import org.hitcon.activities.startBadgeActivityForInitialize
@@ -213,6 +218,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         }
 
 
+
         syncProgressProvider.observe(this, Observer {
             val progress = it!!
 
@@ -337,6 +343,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         R.id.menu_copy -> {
             copyToClipboard(currentAddressProvider.getCurrent(), fab)
+            true
+        }
+        R.id.menu_sync -> {
+            if(!badgeProvider.connected) Toast.makeText(this, "Please connect device first", Toast.LENGTH_LONG).show()
+            else badgeProvider.startUpdateBalance(balanceLiveData?.value?.balance?.toString(), etherLiveData?.value?.balance?.toString(), currentTokenProvider.currentToken)
             true
         }
         R.id.menu_info -> {
