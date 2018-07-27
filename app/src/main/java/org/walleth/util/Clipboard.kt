@@ -13,7 +13,8 @@ import org.walleth.R
 
 
 fun Activity.copyToClipboard(address: Address, view: View) {
-    copyToClipboard(ERC681(address = address.hex).generateURL(), view)
+    //copyToClipboard(ERC681(address = address.hex).generateURL(), view)
+    copyToClipboard(address.hex, view)
 }
 
 fun Activity.copyToClipboard(ethereumString: String, view: View) {

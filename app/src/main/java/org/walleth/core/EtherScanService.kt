@@ -133,6 +133,7 @@ class EtherScanService : LifecycleService() {
                     val newHash = result.getString("result")
 
                     transaction.setHash(if (!newHash.startsWith("0x")) "0x" + newHash else newHash)
+                    transaction.transactionState.error = ""
                 } else if (result.has("error")) {
                     val error = result.getJSONObject("error")
 
@@ -148,6 +149,8 @@ class EtherScanService : LifecycleService() {
                 transaction.transactionState.eventLog = transaction.transactionState.eventLog ?: "" + "relayed via EtherScan"
                 transaction.transactionState.relayedEtherscan = true
 
+                val tx = appDatabase.transactions.getByHash(oldHash)
+                Log.d("Walleth", "old hash: $oldHash find tx: $tx")
                 appDatabase.transactions.deleteByHash(oldHash)
                 appDatabase.transactions.upsert(transaction)
             }

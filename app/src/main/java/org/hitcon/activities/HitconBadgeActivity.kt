@@ -69,7 +69,7 @@ class HitconBadgeActivity : AppCompatActivity() {
         const val REQUEST_BADGE_CONNECT = 9902
         const val REQUEST_BADGE_TRANSFER = 9903
     }
-
+    private val localePermission = LocalePermission(this)
     private val lazyKodein = LazyKodein(appKodein)
     private val badgeProvider: BadgeProvider by lazyKodein.instance()
     private val appDatabase: AppDatabase by lazyKodein.instance()
@@ -172,7 +172,7 @@ class HitconBadgeActivity : AppCompatActivity() {
             val txn = intent?.getTxn()
             txn?.let {
                 if (it.length > 4) {
-
+//
 //                    AlertDialog.Builder(activity)
 //                            .setMessage("send or save?")
 //                            .setPositiveButton(android.R.string.ok) { dialog, _ ->
@@ -182,7 +182,7 @@ class HitconBadgeActivity : AppCompatActivity() {
 //                                        activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
 //                                    }.await()
 //                                }
-//                                activity.setResult(Activity.RESULT_OK)
+//                                activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", activity.getString(R.string.message_transaction_finish)) })
 //                                activity.finish()
 //                            }
 //                            .setNegativeButton(android.R.string.cancel) { dialog, _ ->
@@ -190,7 +190,7 @@ class HitconBadgeActivity : AppCompatActivity() {
 //                                activity.transaction?.let { transaction ->
 //                                    async(UI) {
 //                                        async(CommonPool) {
-//                                            activity.appDatabase.transactions.upsert(transaction.toEntity(null, TransactionState(isPending = false, needsSigningConfirmation = false)))
+//                                            activity.appDatabase.transactions.upsert(transaction.toEntity(null, TransactionState(isPending = false, needsSigningConfirmation = false), hexData = it))
 //                                        }.await()
 //                                    }
 //                                }
@@ -198,14 +198,44 @@ class HitconBadgeActivity : AppCompatActivity() {
 //                                activity.finish()
 //                            }
 //                            .create().show()
+//                        async(UI) {
+//                            async(CommonPool) {
+//                                activity.transaction?.let { transaction ->
+//                                    activity.appDatabase.transactions.upsert(transaction.toEntity(null, TransactionState(isPending = false, needsSigningConfirmation = false), hexData = it))
+//                                }
+//
+//                            }.await()
+//
+//                            activity.setResult(Activity.RESULT_OK)
+//                            activity.finish()
+//                        }
+
                     async(UI) {
-                        val res = async(CommonPool) {
-                           activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
-                        }.await()
-                        if(res != null && !res.has("error"))
-                            activity.setResult(Activity.RESULT_OK)
+
+                        try {
+                            async(CommonPool) {
+                                var result = activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
+                                if(result?.has("error") == true)
+                                    activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", result?.getString("error")) })
+                                else
+                                    activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", activity.getString(R.string.message_transaction_finish)) })
+                            }.await()
+                        }catch(ex: Exception) {
+                            activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", "Internet error") })
+                        }
                         activity.finish()
                     }
+
+
+
+//                    async(UI) {
+//                        val res = async(CommonPool) {
+//                           activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
+//                        }.await()
+//                        if(res != null && !res.has("error"))
+//                            activity.setResult(Activity.RESULT_OK)
+//                        activity.finish()
+//                    }
 
                 } else {
                     AlertDialog.Builder(activity)
@@ -300,20 +330,22 @@ class HitconBadgeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_badge)
         supportActionBar?.setSubtitle(R.string.badge_title)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val adapter = manager.adapter
-        when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED -> ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_PERMISSION)
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED -> ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH), REQUEST_PERMISSION)
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED -> ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH_ADMIN), REQUEST_PERMISSION)
-            !adapter.isEnabled -> startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_PERMISSION)
-            else -> handler.post(mainProcess)
-        }
+
     }
 
     override fun onResume() {
         super.onResume()
         registerReceiver(receiverTxn, IntentFilter(BadgeProvider.ActionReceiveTxn))
+
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val adapter = manager.adapter
+
+        if(!localePermission.isGranted())
+            localePermission.request()
+        else if(!adapter.isEnabled)
+            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_PERMISSION)
+        else
+            handler.post(mainProcess)
     }
 
     override fun onPause() {
@@ -355,15 +387,7 @@ class HitconBadgeActivity : AppCompatActivity() {
 
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        if (requestCode == REQUEST_PERMISSION) {
-            if (grantResults.any { it != PackageManager.PERMISSION_GRANTED }) {
-                AlertDialog.Builder(this).setCancelable(false)
-                        .setTitle(R.string.badge_title)
-                        .setMessage(R.string.message_need_permission)
-                        .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
-                        .create().show()
-            }
-        }
+        localePermission.handleRequestResult(requestCode, grantResults)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

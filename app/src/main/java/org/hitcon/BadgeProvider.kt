@@ -335,8 +335,8 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
         if (connected) {
             Log.d(TAG, "Gatt is connected, disconnect first")
             gatt?.disconnect()
+            gatt = null
         }
-        if (gatt == null) {
             Log.d(TAG, "no gatt instance, connect create")
             gattScanCallback = GattScanCallback(this, leScanCallback)
             serviceBound = false
@@ -348,18 +348,7 @@ class BadgeProvider(private val context: Context, private val appDatabase: AppDa
                     leScanCallback?.onTimeout()
                 }
             }, 15000)
-        } else {
-            Log.d(TAG, "gatt instance exist, reconnect")
-            gatt?.disconnect()
-            serviceBound = false
-            gatt?.connect()
-            postDelayed({
-                if (!serviceBound) {
-                    gatt?.disconnect()
-                    leScanCallback?.onTimeout()
-                }
-            }, 15000)
-        }
+
         //gatt?.disconnect()
         //gatt?.connect()
         gatt?.let { refreshGatt(it) }

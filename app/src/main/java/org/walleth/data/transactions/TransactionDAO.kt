@@ -26,7 +26,7 @@ interface TransactionDAO {
     @Query("SELECT * FROM transactions WHERE source = :source")
     fun getAllForSource(source: TransactionSource): LiveData<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE \"to\" = :address COLLATE NOCASE AND chain=:chain ORDER BY creationEpochSecond DESC")
+    @Query("SELECT * FROM transactions WHERE \"to\" = :address OR ercTo = :address COLLATE NOCASE AND chain=:chain ORDER BY creationEpochSecond DESC")
     fun getIncomingTransactionsForAddressOnChainOrdered(address: Address, chain: ChainDefinition): LiveData<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE \"from\" = :address COLLATE NOCASE  AND chain=:chain ORDER BY creationEpochSecond DESC")
