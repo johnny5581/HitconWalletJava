@@ -20,8 +20,8 @@ android {
         minSdkVersion 21
         targetSdkVersion 26
 
-        versionCode 37
-        versionName "0.35.2"
+        versionCode 38
+        versionName "0.35.3"
         archivesBaseName = "HITCON-WALLET-$versionName"
 
         testInstrumentationRunner "org.walleth.infrastructure.AppReplacingRunner"

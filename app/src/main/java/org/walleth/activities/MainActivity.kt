@@ -347,7 +347,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         }
         R.id.menu_sync -> {
             if(!badgeProvider.connected) Toast.makeText(this, "Please connect device first", Toast.LENGTH_LONG).show()
-            else badgeProvider.startUpdateBalance(balanceLiveData?.value?.balance?.toString(), etherLiveData?.value?.balance?.toString(), currentTokenProvider.currentToken)
+            else badgeProvider.startUpdateBalance(etherLiveData?.value?.balance?.toString(), balanceLiveData?.value?.balance?.toString(), currentTokenProvider.currentToken)
             true
         }
         R.id.menu_info -> {
