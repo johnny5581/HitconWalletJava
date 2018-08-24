@@ -45,6 +45,7 @@ import org.walleth.data.transactions.TransactionState
 import org.walleth.data.transactions.toEntity
 import org.walleth.kethereum.android.TransactionParcel
 import java.io.IOException
+import java.math.BigInteger
 import java.security.cert.CertPathValidatorException
 
 fun Intent.hasHitconQrCode() = this.hasExtra(HitconBadgeActivity.KeyInitQrCode)
@@ -69,6 +70,7 @@ class HitconBadgeActivity : AppCompatActivity() {
         const val REQUEST_BADGE_CONNECT = 9902
         const val REQUEST_BADGE_TRANSFER = 9903
     }
+
     private val localePermission = LocalePermission(this)
     private val lazyKodein = LazyKodein(appKodein)
     private val badgeProvider: BadgeProvider by lazyKodein.instance()
@@ -156,8 +158,21 @@ class HitconBadgeActivity : AppCompatActivity() {
             //intent has text, need sign
             transaction = intent.getTransaction().transaction
             transaction?.let {
-                dialog = ProgressDialog.show(this@HitconBadgeActivity, getString(R.string.badge_title), getString(R.string.message_waiting_transaction))
-                badgeProvider.startTransaction(it)
+                async(UI) {
+                    async(CommonPool) {
+                        val result = getEtherscanResult("module=proxy&action=eth_getTransactionCount&tag=latest&address=${it.from}", networkProvider.getCurrent())
+                        if (result?.has("result") == true) {
+                            it.nonce = try {
+                                val n = BigInteger(result.getString("result"))
+                                n
+                            } catch (e: Exception) { it.nonce }
+                        }
+                    }.await()
+                    dialog = ProgressDialog.show(this@HitconBadgeActivity, getString(R.string.badge_title), getString(R.string.message_waiting_transaction))
+                    badgeProvider.startTransaction(it)
+
+                }
+
             }
         } else {
             setResult(Activity.RESULT_OK, Intent().apply { putExtra(KeyAddress, badgeProvider.entity?.address) })
@@ -215,17 +230,16 @@ class HitconBadgeActivity : AppCompatActivity() {
                         try {
                             async(CommonPool) {
                                 var result = activity.getEtherscanResult("module=proxy&action=eth_sendRawTransaction&hex=$it", activity.networkProvider.getCurrent())
-                                if(result?.has("error") == true)
+                                if (result?.has("error") == true)
                                     activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", result?.getString("error")) })
                                 else
                                     activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", activity.getString(R.string.message_transaction_finish)) })
                             }.await()
-                        }catch(ex: Exception) {
+                        } catch (ex: Exception) {
                             activity.setResult(Activity.RESULT_OK, Intent().apply { putExtra("message", "Internet error") })
                         }
                         activity.finish()
                     }
-
 
 
 //                    async(UI) {
@@ -340,9 +354,9 @@ class HitconBadgeActivity : AppCompatActivity() {
         val manager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val adapter = manager.adapter
 
-        if(!localePermission.isGranted())
+        if (!localePermission.isGranted())
             localePermission.request()
-        else if(!adapter.isEnabled)
+        else if (!adapter.isEnabled)
             startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_PERMISSION)
         else
             handler.post(mainProcess)
